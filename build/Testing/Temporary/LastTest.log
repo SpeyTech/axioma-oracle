@@ -1,0 +1,432 @@
+Start testing: Mar 27 12:13 UTC
+----------------------------------------------------------
+1/12 Testing: test_obs_canonical
+1/12 Test: test_obs_canonical
+Command: "/home/william/axilog/axioma-oracle/build/test_obs_canonical"
+Directory: /home/william/axilog/axioma-oracle/build
+"test_obs_canonical" start time: Mar 27 12:13 UTC
+Output:
+----------------------------------------------------------
+
+=== AX:OBS:v1 Canonicalisation Tests ===
+
+[Params Canonicalisation]
+  [TEST] params_canonical_all_null... PASS
+  [TEST] params_canonical_with_values... PASS
+
+[String Escaping]
+  [TEST] string_escape_basic... PASS
+  [TEST] string_escape_quotes... PASS
+  [TEST] string_escape_backslash... PASS
+  [TEST] string_escape_utf8_direct... PASS
+  [TEST] string_escape_control_char... PASS
+
+[Observation Canonicalisation]
+  [TEST] obs_canonical_structure... PASS
+  [TEST] obs_canonical_deterministic... PASS
+
+[Number Formatting]
+  [TEST] format_int64_positive... PASS
+  [TEST] format_int64_negative... PASS
+  [TEST] format_int64_zero... PASS
+  [TEST] format_uint64_large... PASS
+
+[Hash Formatting]
+  [TEST] format_hash_hex... PASS
+
+=== Results: 14/14 passed ===
+
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_obs_canonical" end time: Mar 27 12:13 UTC
+"test_obs_canonical" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/12 Testing: test_obs_hash
+2/12 Test: test_obs_hash
+Command: "/home/william/axilog/axioma-oracle/build/test_obs_hash"
+Directory: /home/william/axilog/axioma-oracle/build
+"test_obs_hash" start time: Mar 27 12:13 UTC
+Output:
+----------------------------------------------------------
+
+=== AX:OBS:v1 Hash Tests ===
+
+[SHA-256 Known Vectors]
+  [TEST] sha256_empty... PASS
+  [TEST] sha256_abc... PASS
+  [TEST] sha256_long... PASS
+
+[Input Hash]
+  [TEST] input_hash_deterministic... PASS
+  [TEST] input_hash_different... PASS
+
+[Observation Hash]
+  [TEST] obs_hash_computation... PASS
+  [TEST] obs_hash_deterministic... PASS
+  [TEST] obs_hash_changes_with_content... PASS
+  [TEST] obs_hash_stability... PASS
+
+[Multi-block SHA-256]
+  [TEST] sha256_multiblock... PASS
+
+=== Results: 10/10 passed ===
+
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_obs_hash" end time: Mar 27 12:13 UTC
+"test_obs_hash" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/12 Testing: test_encoding
+3/12 Test: test_encoding
+Command: "/home/william/axilog/axioma-oracle/build/test_encoding"
+Directory: /home/william/axilog/axioma-oracle/build
+"test_encoding" start time: Mar 27 12:13 UTC
+Output:
+----------------------------------------------------------
+
+=== AX:OBS:v1 Encoding Tests ===
+
+[UTF-8 Validation]
+  [TEST] utf8_ascii... PASS
+  [TEST] utf8_2byte... PASS
+  [TEST] utf8_3byte... PASS
+  [TEST] utf8_4byte... PASS
+  [TEST] utf8_invalid_continuation... PASS
+  [TEST] utf8_truncated... PASS
+  [TEST] utf8_overlong_2byte... PASS
+  [TEST] utf8_surrogate... PASS
+
+[Control Character Detection]
+  [TEST] control_none... PASS
+  [TEST] control_tab_forbidden... PASS
+  [TEST] control_null_forbidden... PASS
+  [TEST] control_bell_forbidden... PASS
+  [TEST] control_cr_forbidden... PASS
+
+[Line Ending Normalisation]
+  [TEST] line_endings_lf_only... PASS
+  [TEST] line_endings_crlf... PASS
+  [TEST] line_endings_cr_alone... PASS
+  [TEST] line_endings_mixed... PASS
+  [TEST] line_endings_trailing... PASS
+
+[Combined Validation]
+  [TEST] validate_and_normalise_success... PASS
+  [TEST] validate_and_normalise_utf8_fail... PASS
+  [TEST] validate_and_normalise_control_fail... PASS
+
+=== Results: 21/21 passed ===
+
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_encoding" end time: Mar 27 12:13 UTC
+"test_encoding" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/12 Testing: test_ordering
+4/12 Test: test_ordering
+Command: "/home/william/axilog/axioma-oracle/build/test_ordering"
+Directory: /home/william/axilog/axioma-oracle/build
+"test_ordering" start time: Mar 27 12:13 UTC
+Output:
+----------------------------------------------------------
+
+=== AX:OBS:v1 Ordering Tests ===
+
+[Ordering Enforcement]
+  [TEST] ordering_first_admission... PASS
+  [TEST] ordering_sequential... PASS
+  [TEST] ordering_gap_allowed... PASS
+  [TEST] ordering_regression_fail... PASS
+  [TEST] ordering_duplicate_fail... PASS
+  [TEST] ordering_large_sequence... PASS
+  [TEST] ordering_context_update... PASS
+
+[Error State]
+  [TEST] ordering_error_state... PASS
+
+=== Results: 8/8 passed ===
+
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_ordering" end time: Mar 27 12:13 UTC
+"test_ordering" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/12 Testing: test_truncation
+5/12 Test: test_truncation
+Command: "/home/william/axilog/axioma-oracle/build/test_truncation"
+Directory: /home/william/axilog/axioma-oracle/build
+"test_truncation" start time: Mar 27 12:13 UTC
+Output:
+----------------------------------------------------------
+
+=== AX:OBS:v1 Truncation Tests ===
+
+[Normal Size Output]
+  [TEST] normal_size_output... PASS
+  [TEST] max_boundary_output... PASS
+
+[Oversized Output]
+  [TEST] oversized_output_truncated... PASS
+  [TEST] oversized_records_original_size... PASS
+
+[Empty Output]
+  [TEST] empty_output... PASS
+  [TEST] null_output... PASS
+
+[Size Consistency]
+  [TEST] output_size_consistency... PASS
+
+=== Results: 7/7 passed ===
+
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_truncation" end time: Mar 27 12:13 UTC
+"test_truncation" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/12 Testing: test_replay_identity
+6/12 Test: test_replay_identity
+Command: "/home/william/axilog/axioma-oracle/build/test_replay_identity"
+Directory: /home/william/axilog/axioma-oracle/build
+"test_replay_identity" start time: Mar 27 12:13 UTC
+Output:
+----------------------------------------------------------
+
+=== AX:OBS:v1 Replay Identity Tests ===
+
+[Identical Input Replay]
+  [TEST] replay_identical_input... PASS
+  [TEST] replay_canonical_identity... PASS
+  [TEST] input_hash_replay_stable... PASS
+
+[Different Input]
+  [TEST] different_input_different_hash... PASS
+
+[Validation Replay]
+  [TEST] validation_on_replay... PASS
+  [TEST] tampered_obs_fails_validation... PASS
+
+[Params Replay]
+  [TEST] params_replay_identity... PASS
+
+[UTF-8 Replay]
+  [TEST] utf8_replay_identity... PASS
+
+=== Results: 8/8 passed ===
+
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_replay_identity" end time: Mar 27 12:13 UTC
+"test_replay_identity" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/12 Testing: test_cross_build_identity
+7/12 Test: test_cross_build_identity
+Command: "/home/william/axilog/axioma-oracle/build/test_cross_build_identity"
+Directory: /home/william/axilog/axioma-oracle/build
+"test_cross_build_identity" start time: Mar 27 12:13 UTC
+Output:
+----------------------------------------------------------
+=== CROSS-BUILD CANONICALISATION IDENTITY TEST ===
+
+Compiler: GCC 12.2.0
+Optimisation: Enabled
+
+--- OUTPUT ---
+obs_hash:       25c5a320b17a80678e67210be12b8aac1092f28ca2e657fcdbfce0081624fce6
+canonical_len:  492
+canonical_hash: 9cee40af579964043b84f1305acd12dfb80a0956baab95796dacfacc7e4334d9
+
+--- CANONICAL JSON (first 500 bytes) ---
+{"completion_state":"COMPLETE","failure_type":null,"input_hash":"030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc","ledger_seq":12345678901234,"model_id":"gpt-4-turbo-2024-04-09","obs_hash":"25c5a320b17a80678e67210be12b8aac1092f28ca2e657fcdbfce0081624fce6","oracle_id":"azure-openai-prod-westeurope","output":"The answer is 42.\u000aCafé résumé naïve.","output_size":40,"params":{"max_tokens":4096,"seed":42,"temperature":45875,"top_p":58982},"schema_version":"AX:OBS:v1"}...
+
+--- VERIFICATION FINGERPRINTS ---
+FINGERPRINT_OBS_HASH=25c5a320b17a80678e67210be12b8aac1092f28ca2e657fcdbfce0081624fce6
+FINGERPRINT_CANONICAL_HASH=9cee40af579964043b84f1305acd12dfb80a0956baab95796dacfacc7e4334d9
+FINGERPRINT_CANONICAL_LEN=492
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_cross_build_identity" end time: Mar 27 12:13 UTC
+"test_cross_build_identity" time elapsed: 00:00:00
+----------------------------------------------------------
+
+8/12 Testing: test_obs_hash_domain
+8/12 Test: test_obs_hash_domain
+Command: "/home/william/axilog/axioma-oracle/build/test_obs_hash_domain"
+Directory: /home/william/axilog/axioma-oracle/build
+"test_obs_hash_domain" start time: Mar 27 12:13 UTC
+Output:
+----------------------------------------------------------
+
+=== obs_hash DOMAIN VERIFICATION ===
+
+  [TEST] obs_hash_field_empty_during_computation... PASS
+  [TEST] obs_hash_recomputation_matches... PASS
+  [TEST] hash_is_over_canonical_not_struct... PASS
+  [TEST] validation_detects_tampering... PASS
+  [TEST] single_bit_flip_detected... PASS
+
+=== Results: 5/5 passed ===
+
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_obs_hash_domain" end time: Mar 27 12:13 UTC
+"test_obs_hash_domain" time elapsed: 00:00:00
+----------------------------------------------------------
+
+9/12 Testing: test_encoding_rigorous
+9/12 Test: test_encoding_rigorous
+Command: "/home/william/axilog/axioma-oracle/build/test_encoding_rigorous"
+Directory: /home/william/axilog/axioma-oracle/build
+"test_encoding_rigorous" start time: Mar 27 12:13 UTC
+Output:
+----------------------------------------------------------
+
+=== RIGOROUS ENCODING VERIFICATION ===
+
+[Invalid UTF-8 Rejection]
+  [TEST] reject_overlong_C0_AF... PASS
+  [TEST] reject_overlong_C0_80... PASS
+  [TEST] reject_overlong_C1_BF... PASS
+  [TEST] reject_overlong_E0_80_80... PASS
+  [TEST] reject_overlong_F0_80_80_80... PASS
+  [TEST] reject_surrogate_D800... PASS
+  [TEST] reject_surrogate_DFFF... PASS
+  [TEST] reject_invalid_continuation... PASS
+  [TEST] reject_truncated_sequence... PASS
+  [TEST] reject_invalid_FF... PASS
+  [TEST] reject_invalid_FE... PASS
+
+[Line Ending Normalisation]
+  [TEST] CRLF_to_LF... PASS
+  [TEST] CR_alone_to_LF... PASS
+  [TEST] mixed_line_endings... PASS
+  [TEST] empty_between_CRLF... PASS
+  [TEST] consecutive_CR... PASS
+
+[Full Admission Pipeline]
+  [TEST] admission_rejects_invalid_utf8... PASS
+  [TEST] admission_normalises_CRLF... PASS
+  [TEST] admission_rejects_control_chars... PASS
+
+=== Results: 19/19 passed ===
+
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_encoding_rigorous" end time: Mar 27 12:13 UTC
+"test_encoding_rigorous" time elapsed: 00:00:00
+----------------------------------------------------------
+
+10/12 Testing: test_truncation_safety
+10/12 Test: test_truncation_safety
+Command: "/home/william/axilog/axioma-oracle/build/test_truncation_safety"
+Directory: /home/william/axilog/axioma-oracle/build
+"test_truncation_safety" start time: Mar 27 12:13 UTC
+Output:
+----------------------------------------------------------
+
+=== TRUNCATION SAFETY VERIFICATION ===
+
+  [TEST] output_size_is_original... PASS
+  [TEST] truncation_valid_utf8... (truncation occurred) PASS
+  [TEST] truncated_can_be_canonicalised... PASS
+  [TEST] truncation_state_preserved... PASS
+  [TEST] auditor_can_determine_truncation... PASS
+
+=== Results: 5/5 passed ===
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"test_truncation_safety" end time: Mar 27 12:13 UTC
+"test_truncation_safety" time elapsed: 00:00:00
+----------------------------------------------------------
+
+11/12 Testing: test_nfc_limitation
+11/12 Test: test_nfc_limitation
+Command: "/home/william/axilog/axioma-oracle/build/test_nfc_limitation"
+Directory: /home/william/axilog/axioma-oracle/build
+"test_nfc_limitation" start time: Mar 27 12:13 UTC
+Output:
+----------------------------------------------------------
+=== NFC IMPLEMENTATION SCOPE ===
+
+NFC form (café precomposed):  ACCEPTED
+NFD form (café decomposed):   REJECTED
+
+--- IMPLEMENTATION NOTE ---
+Full NFC normalisation requires Unicode tables.
+This implementation validates NFC, does not transform to NFC.
+Non-NFC input is REJECTED at admission boundary.
+Production systems should pre-normalise oracle outputs.
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_nfc_limitation" end time: Mar 27 12:13 UTC
+"test_nfc_limitation" time elapsed: 00:00:00
+----------------------------------------------------------
+
+12/12 Testing: test_hardening
+12/12 Test: test_hardening
+Command: "/home/william/axilog/axioma-oracle/build/test_hardening"
+Directory: /home/william/axilog/axioma-oracle/build
+"test_hardening" start time: Mar 27 12:13 UTC
+Output:
+----------------------------------------------------------
+======================================================================
+axioma-oracle — L3 Hardening Tests
+Audit Closure: H1-H4
+======================================================================
+
+[SUITE] H1: Hash Self-Reference Edge Case
+  [TEST] h1_hash_self_reference_explicit_empty... PASS
+  [TEST] h1_hash_changes_if_not_cleared... PASS
+
+[SUITE] H2: Canonicalisation Single Source of Truth
+  [TEST] h2_canonical_consistency... PASS
+
+[SUITE] H3: Ledger Sequence Authority
+  [TEST] h3_ledger_seq_ordering_enforced... PASS
+  [TEST] h3_ledger_seq_duplicate_rejected... PASS
+
+[SUITE] H4: Encoding Rejection Totality
+  [TEST] h4_invalid_utf8_rejected_before_hash... PASS
+  [TEST] h4_control_char_rejected_before_hash... PASS
+  [TEST] h4_encoding_rejection_totality... PASS
+
+======================================================================
+Results: 8/8 tests passed
+======================================================================
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"test_hardening" end time: Mar 27 12:13 UTC
+"test_hardening" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Mar 27 12:13 UTC

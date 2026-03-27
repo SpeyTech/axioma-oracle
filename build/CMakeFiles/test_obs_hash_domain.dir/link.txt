@@ -1,0 +1,1 @@
+/usr/bin/cc -O2 -DNDEBUG CMakeFiles/test_obs_hash_domain.dir/tests/test_obs_hash_domain.c.o -o test_obs_hash_domain  libaxioma_oracle.a 

@@ -1,0 +1,1 @@
+/usr/bin/cc -O2 -DNDEBUG CMakeFiles/test_cross_build_identity.dir/tests/test_cross_build_identity.c.o -o test_cross_build_identity  libaxioma_oracle.a 

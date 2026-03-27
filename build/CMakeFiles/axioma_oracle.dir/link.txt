@@ -1,0 +1,2 @@
+/usr/bin/ar qc libaxioma_oracle.a CMakeFiles/axioma_oracle.dir/src/hash.c.o CMakeFiles/axioma_oracle.dir/src/validate.c.o CMakeFiles/axioma_oracle.dir/src/canonical.c.o CMakeFiles/axioma_oracle.dir/src/obs.c.o CMakeFiles/axioma_oracle.dir/src/admission.c.o
+/usr/bin/ranlib libaxioma_oracle.a

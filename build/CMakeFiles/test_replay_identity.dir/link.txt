@@ -1,0 +1,1 @@
+/usr/bin/cc -O2 -DNDEBUG CMakeFiles/test_replay_identity.dir/tests/test_replay_identity.c.o -o test_replay_identity  libaxioma_oracle.a 

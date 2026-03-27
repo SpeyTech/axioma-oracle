@@ -1,0 +1,1 @@
+/usr/bin/cc -O2 -DNDEBUG CMakeFiles/test_obs_canonical.dir/tests/test_obs_canonical.c.o -o test_obs_canonical  libaxioma_oracle.a 
