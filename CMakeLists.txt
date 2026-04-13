@@ -53,6 +53,24 @@ target_include_directories(axioma_oracle PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+
+# ==============================================================================
+# libaxilog Linkage (sdk-root)
+# ==============================================================================
+
+# axilog_sha256() and axilog_commit() — replaces standalone hash.c SHA-256
+# Aligns oracle with DVEC-001 §4.3 domain-separated commitment format
+set(AXILOG_SDK_ROOT "$ENV{HOME}/axilog/sdk-root"
+    CACHE PATH "Path to axioma sdk-root installation")
+
+target_include_directories(axioma_oracle PUBLIC
+    ${AXILOG_SDK_ROOT}/include
+)
+
+target_link_libraries(axioma_oracle PRIVATE
+    ${AXILOG_SDK_ROOT}/lib/libaxilog.a
+)
+
 # ==============================================================================
 # Core Test Targets
 # ==============================================================================

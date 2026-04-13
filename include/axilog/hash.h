@@ -1,13 +1,18 @@
 /**
  * @file hash.h
- * @brief SHA-256 hashing for Axioma Oracle Boundary Gateway (L3)
+ * @brief Hashing interface for Axioma Oracle Boundary Gateway (L3)
  *
  * Copyright (c) 2026 The Murray Family Innovation Trust
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: AGPL-3.0-or-later
  *
  * DVEC: v1.3
  * DETERMINISM: D1 — Strict Deterministic
  * MEMORY: Zero Dynamic Allocation
+ *
+ * SHA-256 and domain-separated commitment via libaxilog.
+ * The standalone SHA-256 implementation (ax_sha256_ctx_t) has been
+ * replaced by axilog_sha256() and axilog_commit() from libaxilog,
+ * aligning the oracle with DVEC-001 §4.3 and the SDK golden vectors.
  *
  * @traceability SRS-004-SHALL-009, SRS-004-SHALL-046
  */
@@ -21,66 +26,20 @@
 #include "axilog/limits.h"
 #include "axilog/obs.h"
 
-/* ========================================================================
- * SHA-256 Context
- * ======================================================================== */
-
-/**
- * @brief SHA-256 context structure.
- *
- * All state is caller-owned; no dynamic allocation.
- */
-typedef struct {
-    uint32_t state[8];     /**< Hash state */
-    uint64_t count;        /**< Total bytes processed */
-    uint8_t  buffer[64];   /**< Partial block buffer */
-} ax_sha256_ctx_t;
+/* libaxilog substrate — installed at sdk-root */
+#include "axilog/sha256.h"      /* axilog_sha256() — plain digest */
+#include "axilog/commitment.h"  /* axilog_commit() — domain-separated */
 
 /* ========================================================================
- * SHA-256 Functions
- * ======================================================================== */
-
-/**
- * @brief Initialize SHA-256 context.
- *
- * @param[out] ctx  Context to initialize
- */
-void ax_sha256_init(ax_sha256_ctx_t *ctx);
-
-/**
- * @brief Update SHA-256 with data.
- *
- * @param[in,out] ctx   Context
- * @param[in]     data  Data to hash
- * @param[in]     len   Length of data in bytes
- */
-void ax_sha256_update(ax_sha256_ctx_t *ctx, const uint8_t *data, size_t len);
-
-/**
- * @brief Finalize SHA-256 and produce hash.
- *
- * @param[in,out] ctx   Context (invalidated after this call)
- * @param[out]    hash  Output hash (32 bytes)
- */
-void ax_sha256_final(ax_sha256_ctx_t *ctx, uint8_t hash[32]);
-
-/**
- * @brief One-shot SHA-256 hash.
- *
- * @param[out] hash  Output hash (32 bytes)
- * @param[in]  data  Data to hash
- * @param[in]  len   Length of data in bytes
- */
-void ax_sha256(uint8_t hash[32], const uint8_t *data, size_t len);
-
-/* ========================================================================
- * Observation Hashing
+ * Input Hashing
  * ======================================================================== */
 
 /**
  * @brief Compute input hash for oracle input.
  *
- * Computes SHA-256 of the canonicalised input.
+ * Plain SHA-256 of the canonicalised input — no domain prefix.
+ * input_hash is an input provenance digest, not an evidence commitment.
+ * DVEC-001 §4.4 domain separation applies to evidence type tags only.
  *
  * SRS-004-SHALL-009: Prompt determinism
  *
@@ -94,17 +53,25 @@ void ax_compute_input_hash(
     size_t      input_len
 );
 
+/* ========================================================================
+ * Observation Hashing
+ * ======================================================================== */
+
 /**
- * @brief Compute observation hash.
+ * @brief Compute domain-separated observation hash per DVEC-001 §4.3.
  *
- * Computes SHA-256 of the canonical AX:OBS:v1 record with obs_hash
- * set to empty string, then populates the obs_hash field.
+ * commit(obs) = SHA-256("AX:OBS:v1" || LE64(|payload|) || payload)
+ * where payload = JCS(record with obs_hash="")
+ *
+ * This aligns with axioma-sdk commitObs() and is proven by SDK golden
+ * vector test_golden_commit_obs. Replaces the former plain SHA-256
+ * over the canonical record.
  *
  * SRS-004-SHALL-046: Observation hash
  *
  * @param[in,out] obs  Observation record (obs_hash will be populated)
  *
- * @return AX_OK on success, error code on failure
+ * @return AX_OK on success, AX_ERR_BUFFER or AX_ERR_HASH on failure
  */
 int ax_obs_compute_hash(ax_obs_record_t *obs);
 
