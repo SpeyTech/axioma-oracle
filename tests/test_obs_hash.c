@@ -48,7 +48,7 @@ static void test_sha256_empty(void)
     TEST("sha256_empty");
 
     /* SHA-256("") = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 */
-    ax_sha256(hash, (const uint8_t *)"", 0);
+    axilog_sha256(hash, (const uint8_t *)"", 0);
     ax_format_hash_hex(hex, sizeof(hex), hash, 32);
 
     const char *expected = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
@@ -70,7 +70,7 @@ static void test_sha256_abc(void)
     TEST("sha256_abc");
 
     /* SHA-256("abc") = ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad */
-    ax_sha256(hash, (const uint8_t *)"abc", 3);
+    axilog_sha256(hash, (const uint8_t *)"abc", 3);
     ax_format_hash_hex(hex, sizeof(hex), hash, 32);
 
     const char *expected = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
@@ -93,7 +93,7 @@ static void test_sha256_long(void)
 
     /* SHA-256("The quick brown fox jumps over the lazy dog") */
     const char *input = "The quick brown fox jumps over the lazy dog";
-    ax_sha256(hash, (const uint8_t *)input, strlen(input));
+    axilog_sha256(hash, (const uint8_t *)input, strlen(input));
     ax_format_hash_hex(hex, sizeof(hex), hash, 32);
 
     const char *expected = "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592";
@@ -310,7 +310,7 @@ static void test_sha256_multiblock(void)
 
     /* 64 bytes exactly = one full block */
     const char *input64 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01";
-    ax_sha256(hash, (const uint8_t *)input64, 64);
+    axilog_sha256(hash, (const uint8_t *)input64, 64);
     ax_format_hash_hex(hex, sizeof(hex), hash, 32);
 
     /* Verify it produces 64 hex chars consistently */

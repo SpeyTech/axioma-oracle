@@ -64,7 +64,7 @@ int main(void)
     len = ax_obs_canonicalise(canonical_buf, sizeof(canonical_buf), &obs, 1);
     
     /* Hash the final canonical form */
-    ax_sha256(hash, (const uint8_t *)canonical_buf, (size_t)len);
+    axilog_sha256(hash, (const uint8_t *)canonical_buf, (size_t)len);
     ax_format_hash_hex(hash_hex, sizeof(hash_hex), hash, 32);
     
     printf("Compiler: %s\n", 

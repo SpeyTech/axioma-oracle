@@ -3,7 +3,7 @@
  * @brief Admission helper functions for Axioma Oracle Boundary Gateway (L3)
  *
  * Copyright (c) 2026 The Murray Family Innovation Trust
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: AGPL-3.0-or-later
  *
  * DVEC: v1.3
  * DETERMINISM: D3 — Bounded Non-Deterministic (oracle layer)
@@ -173,6 +173,15 @@ void ax_obs_input_set_invalid_output(
  * When Oracle B's input depends on Oracle A's output, this function
  * computes the derivation hash to ensure deterministic traceability.
  *
+ * Plain SHA-256 over concatenated inputs — no domain prefix.
+ * This is a provenance digest for oracle chaining, not an evidence
+ * commitment. DVEC-001 §4.4 domain separation applies to evidence
+ * type tags only.
+ *
+ * axilog_sha256() has no streaming API. Inputs are assembled into a
+ * stack buffer (obs_hash hex || derivation) then hashed in one call.
+ * obs_hash is always AX_HASH_HEX_SIZE-1 bytes (64 hex chars).
+ *
  * SRS-004-SHALL-039: Oracle isolation
  *
  * @param[out] hash         Output hash (32 bytes)
@@ -186,18 +195,16 @@ void ax_compute_derivation_hash(
     const char               *derivation,
     size_t                    deriv_len)
 {
-    ax_sha256_ctx_t ctx;
+    uint8_t buf[AX_HASH_HEX_SIZE + AX_MAX_OBS_BYTES];
+    size_t  hash_len = strlen(prev_obs->obs_hash);
+    size_t  total    = hash_len;
 
-    ax_sha256_init(&ctx);
+    memcpy(buf, prev_obs->obs_hash, hash_len);
 
-    /* Include previous observation's hash */
-    ax_sha256_update(&ctx, (const uint8_t *)prev_obs->obs_hash,
-                     strlen(prev_obs->obs_hash));
-
-    /* Include derivation context */
     if (derivation != NULL && deriv_len > 0) {
-        ax_sha256_update(&ctx, (const uint8_t *)derivation, deriv_len);
+        memcpy(buf + hash_len, derivation, deriv_len);
+        total += deriv_len;
     }
 
-    ax_sha256_final(&ctx, hash);
+    axilog_sha256(hash, buf, total);
 }

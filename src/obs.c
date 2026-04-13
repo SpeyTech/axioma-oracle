@@ -3,7 +3,7 @@
  * @brief AX:OBS:v1 observation record implementation
  *
  * Copyright (c) 2026 The Murray Family Innovation Trust
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: AGPL-3.0-or-later
  *
  * DVEC: v1.3
  * DETERMINISM: D3 — Bounded Non-Deterministic (oracle layer)
@@ -187,7 +187,7 @@ int ax_obs_admit(
  *   - schema_version == "AX:OBS:v1"
  *   - encoding valid
  *   - params canonical
- *   - obs_hash recomputation matches
+ *   - obs_hash recomputation matches (domain-separated per DVEC-001 §4.3)
  */
 int ax_obs_validate(const ax_obs_record_t *obs, ct_fault_flags_t *faults)
 {
@@ -244,8 +244,23 @@ int ax_obs_validate(const ax_obs_record_t *obs, ct_fault_flags_t *faults)
         return AX_ERR_BUFFER;
     }
 
-    /* Step 2: Hash */
-    ax_sha256(recomputed_hash, (const uint8_t *)canonical_buf, (size_t)len);
+    /* Step 2: Domain-separated commitment per DVEC-001 §4.3
+     * Matches ax_obs_compute_hash() exactly — same tag, same payload. */
+    {
+        ct_fault_flags_t val_faults;
+        memset(&val_faults, 0, sizeof(val_faults));
+        axilog_commit(
+            "AX:OBS:v1",
+            (const uint8_t *)canonical_buf,
+            (uint64_t)len,
+            recomputed_hash,
+            &val_faults
+        );
+        if (ct_fault_any(&val_faults)) {
+            faults->protocol = 1;
+            return AX_ERR_HASH;
+        }
+    }
 
     /* Step 3: Hex encode */
     ax_format_hash_hex(recomputed_hex, sizeof(recomputed_hex),
