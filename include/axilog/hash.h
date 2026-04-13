@@ -9,10 +9,20 @@
  * DETERMINISM: D1 — Strict Deterministic
  * MEMORY: Zero Dynamic Allocation
  *
- * SHA-256 and domain-separated commitment via libaxilog.
- * The standalone SHA-256 implementation (ax_sha256_ctx_t) has been
- * replaced by axilog_sha256() and axilog_commit() from libaxilog,
- * aligning the oracle with DVEC-001 §4.3 and the SDK golden vectors.
+ * SHA-256 is provided exclusively via axilog_sha256() from libaxilog.
+ * No alternative SHA-256 implementations are permitted in this module.
+ *
+ * Two operations are defined:
+ *   axilog_sha256()  — plain digest, for provenance hashing (input_hash,
+ *                      oracle chaining). No domain prefix.
+ *   axilog_commit()  — domain-separated commitment per DVEC-001 §4.3,
+ *                      for evidence records (obs_hash). Tagged, length-prefixed.
+ *
+ * Rationale:
+ *   A single cryptographic substrate shared across axioma-l0, axioma-oracle,
+ *   and the Rust/TypeScript/Python SDKs. Prevents divergence between commitment
+ *   and internal hashing paths. Required for cross-build identity guarantees
+ *   (DVEC-001) and proven by SDK golden vector test_golden_commit_obs.
  *
  * @traceability SRS-004-SHALL-009, SRS-004-SHALL-046
  */
@@ -63,9 +73,8 @@ void ax_compute_input_hash(
  * commit(obs) = SHA-256("AX:OBS:v1" || LE64(|payload|) || payload)
  * where payload = JCS(record with obs_hash="")
  *
- * This aligns with axioma-sdk commitObs() and is proven by SDK golden
- * vector test_golden_commit_obs. Replaces the former plain SHA-256
- * over the canonical record.
+ * Aligns with axioma-sdk commitObs() and is proven by SDK golden
+ * vector test_golden_commit_obs.
  *
  * SRS-004-SHALL-046: Observation hash
  *
