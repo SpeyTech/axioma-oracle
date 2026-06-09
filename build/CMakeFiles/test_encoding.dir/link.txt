@@ -1,1 +1,0 @@
-/usr/bin/cc -O2 -DNDEBUG CMakeFiles/test_encoding.dir/tests/test_encoding.c.o -o test_encoding  libaxioma_oracle.a 

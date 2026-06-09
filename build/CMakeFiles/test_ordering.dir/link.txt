@@ -1,1 +1,0 @@
-/usr/bin/cc -O2 -DNDEBUG CMakeFiles/test_ordering.dir/tests/test_ordering.c.o -o test_ordering  libaxioma_oracle.a 

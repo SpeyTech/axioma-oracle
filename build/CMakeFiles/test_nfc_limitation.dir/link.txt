@@ -1,1 +1,0 @@
-/usr/bin/cc -O2 -DNDEBUG CMakeFiles/test_nfc_limitation.dir/tests/test_nfc_limitation.c.o -o test_nfc_limitation  libaxioma_oracle.a 

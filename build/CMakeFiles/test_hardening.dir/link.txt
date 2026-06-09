@@ -1,1 +1,0 @@
-/usr/bin/cc -O2 -DNDEBUG CMakeFiles/test_hardening.dir/tests/test_hardening.c.o -o test_hardening  libaxioma_oracle.a 

@@ -1,1 +1,0 @@
-/usr/bin/cc -O2 -DNDEBUG CMakeFiles/test_truncation.dir/tests/test_truncation.c.o -o test_truncation  libaxioma_oracle.a 
