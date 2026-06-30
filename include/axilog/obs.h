@@ -3,7 +3,7 @@
  * @brief AX:OBS:v1 observation record structure and operations
  *
  * Copyright (c) 2026 Spey Systems LTD
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: AGPL-3.0-or-later
  *
  * DVEC: v1.3
  * DETERMINISM: D3 — Bounded Non-Deterministic (oracle layer)

@@ -3,7 +3,7 @@
  * @brief Output size and truncation tests for AX:OBS:v1
  *
  * Copyright (c) 2026 Spey Systems LTD
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: AGPL-3.0-or-later
  *
  * @traceability SRS-004-SHALL-040, SRS-004-SHALL-048
  */

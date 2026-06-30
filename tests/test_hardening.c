@@ -3,7 +3,7 @@
  * @brief L3 Hardening Tests — Audit Closure
  *
  * Copyright (c) 2026 Spey Systems LTD
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: AGPL-3.0-or-later
  *
  * This file addresses the hardening items from the L3 closure audit:
  *
