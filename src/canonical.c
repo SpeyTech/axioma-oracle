@@ -2,7 +2,7 @@
  * @file canonical.c
  * @brief RFC 8785 (JCS) canonicalisation for Axioma Oracle Boundary Gateway (L3)
  *
- * Copyright (c) 2026 The Murray Family Innovation Trust
+ * Copyright (c) 2026 Spey Systems LTD
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * DVEC: v1.3

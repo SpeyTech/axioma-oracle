@@ -2,7 +2,7 @@
  * @file test_obs_canonical.c
  * @brief Canonicalisation tests for AX:OBS:v1
  *
- * Copyright (c) 2026 The Murray Family Innovation Trust
+ * Copyright (c) 2026 Spey Systems LTD
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * @traceability SRS-004-SHALL-006, SRS-004-SHALL-036, SRS-004-SHALL-045
