@@ -61,8 +61,10 @@ paths still close. The substrate writes within the caller's (larger)
 struct, so there is no out-of-bounds access. The green path writes
 nothing, so all passing tests are unaffected. The fix is a library
 change (oracle should include the substrate's types.h and define its
-richer L3 fault set under its own name) and awaits a Principal ruling
-on timing.
+richer L3 fault set under its own name). Recorded as E-ABI-1 in
+CONFORMANCE.md §12 (close-out session); default scheduling, pending
+Principal override, is after gateway shakedown and before EXP-1
+stage 3.
 
 The gateway mitigates by construction: strict TU partitioning. Group B
 (gw_ledger.c plus audit's ledger.c) compiles against audit and
@@ -108,11 +110,22 @@ sigaction and sa_flags=0. Found by deployment, not by the 16 tests:
 nothing in the suite exercises signal delivery against a blocking
 accept. The kill test would have masked it later for the wrong reason.
 
-E2 (open, next session): Type=simple means systemctl returns at fork,
-but the socket binds after ledger replay and recovery. The readiness
-gap raced three separate times during acceptance (client connect,
-socket probe, log grep). Fix is Type=notify with a hand-rolled
-sd_notify datagram after the bind; no libsystemd dependency needed.
+E2 (fixed in-tree, close-out session): Type=simple means systemctl
+returns at fork, but the socket binds after ledger replay and
+recovery. The readiness gap raced three separate times during
+acceptance (client connect, socket probe, log grep). Fixed with
+Type=notify and a hand-rolled sd_notify (gw_notify.c, one READY=1
+datagram to $NOTIFY_SOCKET after bind+listen); no libsystemd
+dependency. Deployment acceptance is tools/check_readiness.sh, a
+50-iteration restart-and-connect loop requiring zero refusals.
+
+The E1 test gap is also closed: gateway/tests/test_gw_signals.sh
+(in ctest as test_gw_signals) exercises SIGTERM against a blocking
+accept and SIGKILL mid-request against a local mute endpoint, and
+proves the WAL intent replays as a failure observation on the next
+start. A shellcheck gate over the repo's shell tooling
+(test_shellcheck) joins the suite in both this repo and axioma-l0;
+E1 and the anchor guard were the same lesson twice in one day.
 
 ## Post-delivery state
 

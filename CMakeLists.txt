@@ -215,6 +215,7 @@ if(ORACLE_BUILD_GATEWAY)
         gateway/src/gw_json.c
         gateway/src/gw_wal.c
         gateway/src/gw_client.c
+        gateway/src/gw_notify.c
     )
     target_include_directories(axioma-gateway PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/gateway/include
@@ -244,4 +245,19 @@ if(ORACLE_BUILD_GATEWAY)
     target_include_directories(test_gw_fixture PRIVATE gateway/include)
     target_link_libraries(test_gw_fixture PRIVATE axioma_oracle)
     add_test(NAME test_gw_fixture COMMAND test_gw_fixture)
+
+    # E1 regression and kill-durability: signal delivery against the
+    # running service. E1 was found by deployment because nothing in
+    # the suite exercised it; this does.
+    add_test(NAME test_gw_signals COMMAND sh
+             ${CMAKE_CURRENT_SOURCE_DIR}/gateway/tests/test_gw_signals.sh
+             $<TARGET_FILE:axioma-gateway>)
+    set_tests_properties(test_gw_signals PROPERTIES
+        TIMEOUT 120
+        SKIP_RETURN_CODE 77)
 endif()
+
+# Shell tooling lint gate: scripts are code. Fails loudly when
+# shellcheck is not installed rather than passing vacuously.
+add_test(NAME test_shellcheck COMMAND sh
+         ${CMAKE_CURRENT_SOURCE_DIR}/tools/shellcheck_suite.sh)

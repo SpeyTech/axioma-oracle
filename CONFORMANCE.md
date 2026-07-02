@@ -315,6 +315,46 @@ Any deviation from these values constitutes a conformance failure. This check is
 
 ---
 
+## 12. Errata (post-conformance, gateway delivery review, July 2026)
+
+The SHALL record above is unchanged. The following note records a
+defect found during the L3 gateway delivery and states honestly what
+it does and does not affect, in the same discipline as axioma-l0's
+open findings (SRS-EC-001 errata, F2/F3/F4).
+
+**E-ABI-1 (open): ct_fault_flags_t ABI collision with the substrate.**
+This library's include/axilog/types.h defines its own ct_fault_flags_t
+(16 bytes, ten flags, domain at offset 3, encoding at offset 5) under
+the same include guard (AXILOG_TYPES_H) and the same path
+(axilog/types.h) as the substrate's 8-byte type, whose domain field
+sits at offset 5 (axioma-l0's l0_errors.h asserts the 8-byte size).
+Because the guard suppresses the second inclusion, oracle translation
+units see only the 16-byte type, yet src/hash.c passes a pointer to it
+into axilog_commit in libaxilog, which was compiled against the 8-byte
+layout. On a commit fault, the substrate writes domain at its offset
+5, which lands in this library's encoding field.
+
+Severity, honestly qualified: fault misattribution only. ct_fault_any
+ORs every byte, so the failure is still detected and every fail-closed
+path still closes. The substrate writes within the caller's larger
+struct, so there is no out-of-bounds access. The green path writes
+nothing, so conformance statements 1 through 11 and all 100 passing
+tests are unaffected. Statement 11 should nonetheless be read with
+this erratum attached: the fields are uint8_t, but the layout is not
+the substrate's.
+
+Fix and scheduling (default ruling, Principal may override): the
+library adopts the substrate's types.h and defines its richer L3 fault
+set under its own name. Scheduled after gateway shakedown and before
+EXP-1 stage 3. Fault attribution matters most when money and
+pre-registered claims are on the line; churning the library while the
+gateway is being proven against it is two moving parts where one
+suffices. The gateway itself is immune by construction through strict
+TU partitioning: the ledger seam (gw_ledger.h) passes bare bytes and
+no axilog type crosses it.
+
+---
+
 *axioma-oracle — SRS-004 v0.3 VERIFIED CONFORMANT*
 *SpeyTech · April 2026*
 *Patent GB2521625.0*

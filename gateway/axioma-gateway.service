@@ -20,7 +20,12 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=simple
+# E2: Type=simple reported ready at fork, before the socket existed;
+# the readiness race fired three times during acceptance. The binary
+# sends READY=1 itself (gw_notify.c) after bind+listen; systemctl
+# start/restart now blocks until the socket is accepting.
+Type=notify
+NotifyAccess=main
 User=axgw
 Group=axgw
 EnvironmentFile=/etc/axioma-gateway.env

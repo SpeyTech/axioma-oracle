@@ -24,6 +24,7 @@
 #include "gw_ledger.h"
 #include "gw_client.h"
 #include "gw_json.h"
+#include "gw_notify.h"
 
 #include <axilog/oracle.h>
 #include <axilog/obs.h>
@@ -623,6 +624,14 @@ int main(int argc, char **argv)
         gw_log("error", "fault", "bind/listen", -1, -1, 0);
         return 1;
     }
+
+    /* E2: readiness is bind+listen, not fork. Under systemd
+     * (Type=notify) this datagram is the start signal; on a manual
+     * run NOTIFY_SOCKET is unset and the call is a no-op. A failed
+     * send is logged and the service continues: it is up, only the
+     * supervisor's view of it is wrong, and it will say so. */
+    if (gw_notify_ready() != 0)
+        gw_log("warn", "fault", "sd_notify READY=1 send failed", -1, -1, 0);
 
     gw_log("info", "startup", cfg.model_id, -1, -1, gwl_seq());
 
