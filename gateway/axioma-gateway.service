@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Spey Systems Ltd (SC889983)
+#
+# axioma-gateway.service
+#
+# Install:
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin axgw
+#   sudo mkdir -p /var/lib/axioma-gateway && sudo chown axgw:axgw /var/lib/axioma-gateway
+#   sudo install -m 0644 axioma-gateway.service /etc/systemd/system/
+#   sudo install -m 0600 -o root -g root gateway.env /etc/axioma-gateway.env
+#     (gateway.env contains exactly: AX_ORACLE_ANTHROPIC_KEY=...)
+#   sudo systemctl daemon-reload && sudo systemctl enable --now axioma-gateway
+#
+# The key lives only in the root-owned EnvironmentFile; it is not in the
+# unit, not in the config, and the service scrubs it from every log line.
+
+[Unit]
+Description=Axioma L3 Oracle Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=axgw
+Group=axgw
+EnvironmentFile=/etc/axioma-gateway.env
+ExecStart=/usr/local/bin/axioma-gateway /etc/axioma-gateway.conf
+Restart=on-failure
+RestartSec=2
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/axioma-gateway
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target

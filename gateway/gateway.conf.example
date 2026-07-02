@@ -1,0 +1,30 @@
+# axioma-gateway configuration example
+# Copy to /etc/axioma-gateway.conf and adjust. Unknown keys are rejected.
+# The SHA-256 of this file is committed to the evidence chain as
+# AX:STATE:v1 at every service start.
+
+# Required
+socket_path=/var/lib/axioma-gateway/gw.sock
+ledger_path=/var/lib/axioma-gateway/l6-evidence.bin
+wal_path=/var/lib/axioma-gateway/wal.open
+log_path=/var/lib/axioma-gateway/gw.log
+model_id=claude-haiku-4-5-20251001
+
+# Provider surface (defaults shown)
+#api_url=https://api.anthropic.com/v1/messages
+#anthropic_version=2023-06-01
+#oracle_id=anthropic-messages-api
+
+# Client contract (defaults shown)
+#connect_timeout_s=10
+#response_timeout_s=300
+#max_attempts=3
+#max_response_bytes=4194304
+
+# Spend guard: refusals past this per-run count are pre-spend and
+# log-only. Raise deliberately per evaluation stage.
+#call_budget=25
+
+# Request defaults and bounds
+#default_max_tokens=1024
+#max_prompt_bytes=32768
