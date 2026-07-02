@@ -182,3 +182,66 @@ message(STATUS "  Build Type:  ${CMAKE_BUILD_TYPE}")
 message(STATUS "  ASAN:        ${ENABLE_ASAN}")
 message(STATUS "  UBSAN:       ${ENABLE_UBSAN}")
 message(STATUS "")
+
+# ==============================================================================
+# L3 Gateway Service (net-new service layer; the library is not modified)
+# ==============================================================================
+option(ORACLE_BUILD_GATEWAY "Build the gateway service" ON)
+if(ORACLE_BUILD_GATEWAY)
+    find_package(CURL REQUIRED)
+
+    set(AXIOMA_AUDIT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../axioma-audit"
+        CACHE PATH "Path to axioma-audit checkout")
+
+    # TU group B: the ledger seam compiles against audit + substrate only.
+    # The oracle's axilog/types.h is a different type under the same name;
+    # keeping the include sets disjoint per TU is load-bearing.
+    add_library(gw-ledger STATIC
+        gateway/src/gw_ledger.c
+        ${AXIOMA_AUDIT_ROOT}/src/ledger.c
+    )
+    target_include_directories(gw-ledger PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/gateway/include
+        ${AXIOMA_AUDIT_ROOT}/include
+        ${AXILOG_SDK_ROOT}/include
+    )
+    target_link_libraries(gw-ledger PRIVATE ${AXILOG_SDK_ROOT}/lib/libaxilog.a)
+
+    # TU group A: everything else, against the oracle library.
+    add_executable(axioma-gateway
+        gateway/src/gw_main.c
+        gateway/src/gw_config.c
+        gateway/src/gw_log.c
+        gateway/src/gw_json.c
+        gateway/src/gw_wal.c
+        gateway/src/gw_client.c
+    )
+    target_include_directories(axioma-gateway PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/gateway/include
+    )
+    target_link_libraries(axioma-gateway PRIVATE
+        axioma_oracle gw-ledger CURL::libcurl)
+
+    add_executable(test_gw_json
+        gateway/tests/test_gw_json.c gateway/src/gw_json.c)
+    target_include_directories(test_gw_json PRIVATE gateway/include)
+    add_test(NAME test_gw_json COMMAND test_gw_json)
+
+    add_executable(test_gw_ledger gateway/tests/test_gw_ledger.c)
+    target_include_directories(test_gw_ledger PRIVATE
+        gateway/include ${AXIOMA_AUDIT_ROOT}/include ${AXILOG_SDK_ROOT}/include)
+    target_link_libraries(test_gw_ledger PRIVATE gw-ledger
+        ${AXILOG_SDK_ROOT}/lib/libaxilog.a)
+    add_test(NAME test_gw_ledger COMMAND test_gw_ledger)
+
+    add_executable(test_gw_wal
+        gateway/tests/test_gw_wal.c gateway/src/gw_wal.c)
+    target_include_directories(test_gw_wal PRIVATE gateway/include)
+    add_test(NAME test_gw_wal COMMAND test_gw_wal)
+
+    add_executable(test_gw_fixture
+        gateway/tests/test_gw_fixture.c gateway/src/gw_json.c)
+    target_include_directories(test_gw_fixture PRIVATE gateway/include)
+    target_link_libraries(test_gw_fixture PRIVATE axioma_oracle)
+    add_test(NAME test_gw_fixture COMMAND test_gw_fixture)
+endif()
