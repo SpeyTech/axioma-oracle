@@ -13,7 +13,7 @@
 #include "axilog/obs.h"
 #include "axilog/hash.h"
 #include "axilog/canonical.h"
-#include "axilog/types.h"
+#include "axilog/l3_types.h"
 
 /* Test counters */
 static int tests_run = 0;
@@ -51,7 +51,7 @@ static void test_replay_identical_input(void)
     ax_obs_record_t obs1, obs2;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx1, ctx2;
-    ct_fault_flags_t faults1, faults2;
+    ax_l3_fault_flags_t faults1, faults2;
 
     TEST("replay_identical_input");
 
@@ -73,12 +73,12 @@ static void test_replay_identical_input(void)
 
     /* First admission */
     ax_admission_ctx_init(&ctx1);
-    ct_fault_clear(&faults1);
+    ax_l3_fault_init(&faults1);
     ax_obs_admit(&obs1, output_buf1, sizeof(output_buf1), &in, &ctx1, &faults1);
 
     /* Second admission (simulating replay) */
     ax_admission_ctx_init(&ctx2);
-    ct_fault_clear(&faults2);
+    ax_l3_fault_init(&faults2);
     ax_obs_admit(&obs2, output_buf2, sizeof(output_buf2), &in, &ctx2, &faults2);
 
     /* Compare hashes */
@@ -96,7 +96,7 @@ static void test_replay_canonical_identity(void)
     ax_obs_record_t obs1, obs2;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx1, ctx2;
-    ct_fault_flags_t faults1, faults2;
+    ax_l3_fault_flags_t faults1, faults2;
     int len1, len2;
 
     TEST("replay_canonical_identity");
@@ -115,11 +115,11 @@ static void test_replay_canonical_identity(void)
     ax_oracle_params_init_null(&in.params);
 
     ax_admission_ctx_init(&ctx1);
-    ct_fault_clear(&faults1);
+    ax_l3_fault_init(&faults1);
     ax_obs_admit(&obs1, output_buf1, sizeof(output_buf1), &in, &ctx1, &faults1);
 
     ax_admission_ctx_init(&ctx2);
-    ct_fault_clear(&faults2);
+    ax_l3_fault_init(&faults2);
     ax_obs_admit(&obs2, output_buf2, sizeof(output_buf2), &in, &ctx2, &faults2);
 
     /* Canonicalise both */
@@ -143,7 +143,7 @@ static void test_input_hash_replay_stable(void)
     ax_obs_record_t obs1, obs2;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx1, ctx2;
-    ct_fault_flags_t faults1, faults2;
+    ax_l3_fault_flags_t faults1, faults2;
 
     TEST("input_hash_replay_stable");
 
@@ -160,11 +160,11 @@ static void test_input_hash_replay_stable(void)
     ax_oracle_params_init_null(&in.params);
 
     ax_admission_ctx_init(&ctx1);
-    ct_fault_clear(&faults1);
+    ax_l3_fault_init(&faults1);
     ax_obs_admit(&obs1, output_buf1, sizeof(output_buf1), &in, &ctx1, &faults1);
 
     ax_admission_ctx_init(&ctx2);
-    ct_fault_clear(&faults2);
+    ax_l3_fault_init(&faults2);
     ax_obs_admit(&obs2, output_buf2, sizeof(output_buf2), &in, &ctx2, &faults2);
 
     if (memcmp(obs1.input_hash, obs2.input_hash, AX_HASH_SIZE) == 0) {
@@ -183,7 +183,7 @@ static void test_different_input_different_hash(void)
     ax_obs_record_t obs1, obs2;
     ax_obs_input_t in1, in2;
     ax_admission_ctx_t ctx1, ctx2;
-    ct_fault_flags_t faults1, faults2;
+    ax_l3_fault_flags_t faults1, faults2;
 
     TEST("different_input_different_hash");
 
@@ -214,11 +214,11 @@ static void test_different_input_different_hash(void)
     ax_oracle_params_init_null(&in2.params);
 
     ax_admission_ctx_init(&ctx1);
-    ct_fault_clear(&faults1);
+    ax_l3_fault_init(&faults1);
     ax_obs_admit(&obs1, output_buf1, sizeof(output_buf1), &in1, &ctx1, &faults1);
 
     ax_admission_ctx_init(&ctx2);
-    ct_fault_clear(&faults2);
+    ax_l3_fault_init(&faults2);
     ax_obs_admit(&obs2, output_buf2, sizeof(output_buf2), &in2, &ctx2, &faults2);
 
     if (strcmp(obs1.obs_hash, obs2.obs_hash) != 0) {
@@ -237,7 +237,7 @@ static void test_validation_on_replay(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int result;
 
     TEST("validation_on_replay");
@@ -255,14 +255,14 @@ static void test_validation_on_replay(void)
     ax_oracle_params_init_null(&in.params);
 
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     ax_obs_admit(&obs, output_buf1, sizeof(output_buf1), &in, &ctx, &faults);
 
     /* Validate the admitted observation */
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     result = ax_obs_validate(&obs, &faults);
 
-    if (result == AX_OK && !ct_fault_any(&faults)) {
+    if (result == AX_OK && !ax_l3_fault_any(&faults)) {
         PASS();
     } else {
         FAIL("validation failed on valid observation");
@@ -274,7 +274,7 @@ static void test_tampered_obs_fails_validation(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int result;
 
     TEST("tampered_obs_fails_validation");
@@ -292,7 +292,7 @@ static void test_tampered_obs_fails_validation(void)
     ax_oracle_params_init_null(&in.params);
 
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     ax_obs_admit(&obs, output_buf1, sizeof(output_buf1), &in, &ctx, &faults);
 
     /* Tamper with output */
@@ -300,7 +300,7 @@ static void test_tampered_obs_fails_validation(void)
     output_buf1[0] = 'X';  /* Change first character */
 
     /* Validation should fail due to hash mismatch */
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     result = ax_obs_validate(&obs, &faults);
 
     if (result == AX_ERR_HASH && faults.protocol) {
@@ -320,7 +320,7 @@ static void test_params_replay_identity(void)
     ax_obs_record_t obs1, obs2;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx1, ctx2;
-    ct_fault_flags_t faults1, faults2;
+    ax_l3_fault_flags_t faults1, faults2;
     char params1[256], params2[256];
 
     TEST("params_replay_identity");
@@ -341,11 +341,11 @@ static void test_params_replay_identity(void)
     in.params.top_p = 65536;
 
     ax_admission_ctx_init(&ctx1);
-    ct_fault_clear(&faults1);
+    ax_l3_fault_init(&faults1);
     ax_obs_admit(&obs1, output_buf1, sizeof(output_buf1), &in, &ctx1, &faults1);
 
     ax_admission_ctx_init(&ctx2);
-    ct_fault_clear(&faults2);
+    ax_l3_fault_init(&faults2);
     ax_obs_admit(&obs2, output_buf2, sizeof(output_buf2), &in, &ctx2, &faults2);
 
     ax_params_canonicalise(params1, sizeof(params1), &obs1.params);
@@ -367,7 +367,7 @@ static void test_utf8_replay_identity(void)
     ax_obs_record_t obs1, obs2;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx1, ctx2;
-    ct_fault_flags_t faults1, faults2;
+    ax_l3_fault_flags_t faults1, faults2;
 
     TEST("utf8_replay_identity");
 
@@ -384,11 +384,11 @@ static void test_utf8_replay_identity(void)
     ax_oracle_params_init_null(&in.params);
 
     ax_admission_ctx_init(&ctx1);
-    ct_fault_clear(&faults1);
+    ax_l3_fault_init(&faults1);
     ax_obs_admit(&obs1, output_buf1, sizeof(output_buf1), &in, &ctx1, &faults1);
 
     ax_admission_ctx_init(&ctx2);
-    ct_fault_clear(&faults2);
+    ax_l3_fault_init(&faults2);
     ax_obs_admit(&obs2, output_buf2, sizeof(output_buf2), &in, &ctx2, &faults2);
 
     if (strcmp(obs1.obs_hash, obs2.obs_hash) == 0 &&

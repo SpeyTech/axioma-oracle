@@ -32,7 +32,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "axilog/types.h"
+#include "axilog/l3_types.h"
 #include "axilog/limits.h"
 #include "axilog/obs.h"
 

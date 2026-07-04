@@ -61,7 +61,7 @@ int ax_obs_admit(
     size_t                output_buf_size,
     const ax_obs_input_t *in,
     ax_admission_ctx_t   *ctx,
-    ct_fault_flags_t     *faults)
+    ax_l3_fault_flags_t     *faults)
 {
     int result;
     int normalised_len;
@@ -189,7 +189,7 @@ int ax_obs_admit(
  *   - params canonical
  *   - obs_hash recomputation matches (domain-separated per DVEC-001 §4.3)
  */
-int ax_obs_validate(const ax_obs_record_t *obs, ct_fault_flags_t *faults)
+int ax_obs_validate(const ax_obs_record_t *obs, ax_l3_fault_flags_t *faults)
 {
     char canonical_buf[AX_CANONICAL_BUFFER_SIZE];
     uint8_t recomputed_hash[AX_HASH_SIZE];
@@ -247,8 +247,8 @@ int ax_obs_validate(const ax_obs_record_t *obs, ct_fault_flags_t *faults)
     /* Step 2: Domain-separated commitment per DVEC-001 §4.3
      * Matches ax_obs_compute_hash() exactly — same tag, same payload. */
     {
-        ct_fault_flags_t val_faults;
-        memset(&val_faults, 0, sizeof(val_faults));
+        ct_fault_flags_t val_faults; /* substrate layout — crosses axilog_commit (E-ABI-1 fixed) */
+        ct_fault_init(&val_faults);
         axilog_commit(
             "AX:OBS:v1",
             (const uint8_t *)canonical_buf,

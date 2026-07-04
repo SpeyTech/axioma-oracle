@@ -12,7 +12,7 @@
 #include <string.h>
 #include "axilog/validate.h"
 #include "axilog/obs.h"
-#include "axilog/types.h"
+#include "axilog/l3_types.h"
 
 static int tests_run = 0;
 static int tests_passed = 0;
@@ -287,7 +287,7 @@ static void test_admission_rejects_invalid_utf8(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     char output_buf[256];
     int result;
     
@@ -306,7 +306,7 @@ static void test_admission_rejects_invalid_utf8(void)
     ax_oracle_params_init_null(&in.params);
     
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     
     result = ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
     
@@ -323,7 +323,7 @@ static void test_admission_normalises_crlf(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     char output_buf[256];
     int result;
     
@@ -342,7 +342,7 @@ static void test_admission_normalises_crlf(void)
     ax_oracle_params_init_null(&in.params);
     
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     
     result = ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
     
@@ -363,7 +363,7 @@ static void test_admission_rejects_control_chars(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     char output_buf[256];
     int result;
     
@@ -382,7 +382,7 @@ static void test_admission_rejects_control_chars(void)
     ax_oracle_params_init_null(&in.params);
     
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     
     result = ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
     

@@ -5,9 +5,12 @@
  *
  * This header deliberately uses only plain C types. The implementation
  * compiles against axioma-audit and the axilog substrate; the rest of
- * the gateway compiles against axioma-oracle, whose axilog/types.h is
- * a different type under the same name. No axilog type crosses this
- * seam. See the ABI note in the delivery report.
+ * the gateway compiles against axioma-oracle. E-ABI-1 (the oracle's
+ * former shadow of axilog/types.h) is fixed and ct_fault_flags_t is
+ * one type estate-wide, but the seam keeps passing bare bytes: the TU
+ * partition is defence in depth, not a workaround for the healed
+ * wound. See the ABI note in the delivery report and CONFORMANCE.md
+ * section 12.
  *
  * Durable form: an append-only evidence file of framed records
  * (u32le tag_len, tag, u64le payload_len, payload, 32-byte commit).

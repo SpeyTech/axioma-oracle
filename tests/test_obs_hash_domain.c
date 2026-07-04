@@ -69,14 +69,14 @@ static void test_obs_hash_recomputation_matches(void)
     uint8_t recomputed[32];
     char recomputed_hex[65];
     char canonical_buf[8192];
-    ct_fault_flags_t commit_faults;
+    ct_fault_flags_t commit_faults;  /* substrate layout — crosses axilog_commit (E-ABI-1 fixed) */
     int len;
 
     TEST("obs_hash_recomputation_matches");
 
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
 
     memset(&in, 0, sizeof(in));
     in.completion_state = AX_COMPLETION_COMPLETE;
@@ -91,7 +91,7 @@ static void test_obs_hash_recomputation_matches(void)
     ax_oracle_params_init_null(&in.params);
 
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
     /* Store original hash */
@@ -102,7 +102,7 @@ static void test_obs_hash_recomputation_matches(void)
      * Must match ax_obs_compute_hash() exactly. */
     obs.obs_hash[0] = '\0';
     len = ax_obs_canonicalise(canonical_buf, sizeof(canonical_buf), &obs, 0);
-    memset(&commit_faults, 0, sizeof(commit_faults));
+    ct_fault_init(&commit_faults);
     axilog_commit(
         "AX:OBS:v1",
         (const uint8_t *)canonical_buf,
@@ -131,7 +131,7 @@ static void test_hash_is_over_canonical_not_struct(void)
 
     ax_obs_input_t in;
     ax_admission_ctx_t ctx1, ctx2;
-    ct_fault_flags_t faults1, faults2;
+    ax_l3_fault_flags_t faults1, faults2;
 
     memset(&in, 0, sizeof(in));
     in.completion_state = AX_COMPLETION_COMPLETE;
@@ -146,11 +146,11 @@ static void test_hash_is_over_canonical_not_struct(void)
     ax_oracle_params_init_null(&in.params);
 
     ax_admission_ctx_init(&ctx1);
-    ct_fault_clear(&faults1);
+    ax_l3_fault_init(&faults1);
     ax_obs_admit(&obs1, output_buf1, sizeof(output_buf1), &in, &ctx1, &faults1);
 
     ax_admission_ctx_init(&ctx2);
-    ct_fault_clear(&faults2);
+    ax_l3_fault_init(&faults2);
     ax_obs_admit(&obs2, output_buf2, sizeof(output_buf2), &in, &ctx2, &faults2);
 
     /* Despite being in different memory locations, hashes MUST match */
@@ -168,7 +168,7 @@ static void test_validation_detects_tampering(void)
 {
     ax_obs_record_t obs;
     char output_buf[256];
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int result;
 
     TEST("validation_detects_tampering");
@@ -189,13 +189,13 @@ static void test_validation_detects_tampering(void)
     ax_oracle_params_init_null(&in.params);
 
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
     /* Tamper with a single character in obs_hash */
     obs.obs_hash[0] = (obs.obs_hash[0] == 'a') ? 'b' : 'a';
 
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     result = ax_obs_validate(&obs, &faults);
 
     if (result == AX_ERR_HASH && faults.protocol) {
@@ -210,7 +210,7 @@ static void test_single_bit_flip_detected(void)
 {
     ax_obs_record_t obs;
     char output_buf[256];
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int result;
 
     TEST("single_bit_flip_detected");
@@ -231,13 +231,13 @@ static void test_single_bit_flip_detected(void)
     ax_oracle_params_init_null(&in.params);
 
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
     /* Flip one bit in output */
     output_buf[5] ^= 0x01;
 
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     result = ax_obs_validate(&obs, &faults);
 
     if (result == AX_ERR_HASH && faults.protocol) {

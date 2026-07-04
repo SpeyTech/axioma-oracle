@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include "axilog/obs.h"
 #include "axilog/limits.h"
-#include "axilog/types.h"
+#include "axilog/l3_types.h"
 
 /* Test counters */
 static int tests_run = 0;
@@ -49,7 +49,7 @@ static void test_normal_size_output(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int result;
 
     TEST("normal_size_output");
@@ -67,7 +67,7 @@ static void test_normal_size_output(void)
     ax_oracle_params_init_null(&in.params);
 
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
 
     result = ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
@@ -87,7 +87,7 @@ static void test_max_boundary_output(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int result;
     size_t i;
 
@@ -112,7 +112,7 @@ static void test_max_boundary_output(void)
     ax_oracle_params_init_null(&in.params);
 
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
 
     result = ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
@@ -133,7 +133,7 @@ static void test_oversized_output_truncated(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int result;
     size_t i;
 
@@ -159,7 +159,7 @@ static void test_oversized_output_truncated(void)
     ax_oracle_params_init_null(&in.params);
 
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
 
     result = ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
@@ -179,7 +179,7 @@ static void test_oversized_records_original_size(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     size_t i;
 
     TEST("oversized_records_original_size");
@@ -203,7 +203,7 @@ static void test_oversized_records_original_size(void)
     ax_oracle_params_init_null(&in.params);
 
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
 
     ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
@@ -226,7 +226,7 @@ static void test_empty_output(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int result;
 
     TEST("empty_output");
@@ -244,7 +244,7 @@ static void test_empty_output(void)
     ax_oracle_params_init_null(&in.params);
 
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
 
     result = ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
@@ -260,7 +260,7 @@ static void test_null_output(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int result;
 
     TEST("null_output");
@@ -278,7 +278,7 @@ static void test_null_output(void)
     ax_oracle_params_init_null(&in.params);
 
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
 
     result = ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
@@ -298,7 +298,7 @@ static void test_output_size_consistency(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
 
     TEST("output_size_consistency");
 
@@ -315,7 +315,7 @@ static void test_output_size_consistency(void)
     ax_oracle_params_init_null(&in.params);
 
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
 
     ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 

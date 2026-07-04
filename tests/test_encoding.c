@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "axilog/validate.h"
-#include "axilog/types.h"
+#include "axilog/l3_types.h"
 
 /* Test counters */
 static int tests_run = 0;
@@ -308,16 +308,16 @@ static void test_line_endings_trailing(void)
 static void test_validate_and_normalise_success(void)
 {
     char buf[256];
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int len;
 
     TEST("validate_and_normalise_success");
 
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     const char *input = "Valid UTF-8 text\r\nwith CRLF";
     len = ax_validate_and_normalise(buf, sizeof(buf), input, strlen(input), &faults);
 
-    if (len > 0 && !ct_fault_any(&faults)) {
+    if (len > 0 && !ax_l3_fault_any(&faults)) {
         PASS();
     } else {
         FAIL("valid input rejected");
@@ -327,12 +327,12 @@ static void test_validate_and_normalise_success(void)
 static void test_validate_and_normalise_utf8_fail(void)
 {
     char buf[256];
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int len;
 
     TEST("validate_and_normalise_utf8_fail");
 
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     const char input[] = "Invalid \xC0\x80 UTF-8";
     len = ax_validate_and_normalise(buf, sizeof(buf), input, strlen(input), &faults);
 
@@ -346,12 +346,12 @@ static void test_validate_and_normalise_utf8_fail(void)
 static void test_validate_and_normalise_control_fail(void)
 {
     char buf[256];
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int len;
 
     TEST("validate_and_normalise_control_fail");
 
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     /* After normalising line endings, this still has tab */
     const char *input = "Text\twith\ttabs";
     len = ax_validate_and_normalise(buf, sizeof(buf), input, strlen(input), &faults);

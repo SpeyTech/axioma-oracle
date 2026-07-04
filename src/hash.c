@@ -63,7 +63,7 @@ int ax_obs_compute_hash(ax_obs_record_t *obs)
 {
     char             canonical_buf[AX_CANONICAL_BUFFER_SIZE];
     uint8_t          hash[AX_HASH_SIZE];
-    ct_fault_flags_t faults;
+    ct_fault_flags_t faults;    /* substrate layout — crosses axilog_commit (E-ABI-1 fixed) */
     int              len;
 
     /* Step 1: Set obs_hash to empty string — breaks circular dependency */
@@ -76,7 +76,7 @@ int ax_obs_compute_hash(ax_obs_record_t *obs)
     }
 
     /* Step 3: Domain-separated commitment per DVEC-001 §4.3 */
-    memset(&faults, 0, sizeof(faults));
+    ct_fault_init(&faults);
     axilog_commit(
         "AX:OBS:v1",                     /* tag — ASCII, no null terminator in hash */
         (const uint8_t *)canonical_buf,  /* payload = JCS of record with obs_hash="" */

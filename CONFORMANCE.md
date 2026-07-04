@@ -322,36 +322,61 @@ defect found during the L3 gateway delivery and states honestly what
 it does and does not affect, in the same discipline as axioma-l0's
 open findings (SRS-EC-001 errata, F2/F3/F4).
 
-**E-ABI-1 (open): ct_fault_flags_t ABI collision with the substrate.**
-This library's include/axilog/types.h defines its own ct_fault_flags_t
+**E-ABI-1 (fixed, 2026-07-04, commit tagged e-abi-1-fixed): ct_fault_flags_t
+ABI collision with the substrate.**
+This library's include/axilog/types.h defined its own ct_fault_flags_t
 (16 bytes, ten flags, domain at offset 3, encoding at offset 5) under
 the same include guard (AXILOG_TYPES_H) and the same path
 (axilog/types.h) as the substrate's 8-byte type, whose domain field
 sits at offset 5 (axioma-l0's l0_errors.h asserts the 8-byte size).
-Because the guard suppresses the second inclusion, oracle translation
-units see only the 16-byte type, yet src/hash.c passes a pointer to it
+Because the guard suppressed the second inclusion, oracle translation
+units saw only the 16-byte type, yet src/hash.c passed a pointer to it
 into axilog_commit in libaxilog, which was compiled against the 8-byte
-layout. On a commit fault, the substrate writes domain at its offset
-5, which lands in this library's encoding field.
+layout. On a commit fault, the substrate wrote domain at its offset 5,
+which landed in this library's encoding field. The same crossing
+existed in src/obs.c (ax_obs_validate) and tests/test_obs_hash_domain.c.
 
 Severity, honestly qualified: fault misattribution only. ct_fault_any
-ORs every byte, so the failure is still detected and every fail-closed
-path still closes. The substrate writes within the caller's larger
-struct, so there is no out-of-bounds access. The green path writes
-nothing, so conformance statements 1 through 11 and all 100 passing
-tests are unaffected. Statement 11 should nonetheless be read with
-this erratum attached: the fields are uint8_t, but the layout is not
-the substrate's.
+ORed every byte, so the failure was still detected and every
+fail-closed path still closed. The substrate wrote within the caller's
+larger struct, so there was no out-of-bounds access. The green path
+writes nothing, so conformance statements 1 through 11 and all 100
+passing tests were unaffected.
 
-Fix and scheduling (default ruling, Principal may override): the
-library adopts the substrate's types.h and defines its richer L3 fault
-set under its own name. Scheduled after gateway shakedown and before
-EXP-1 stage 3. Fault attribution matters most when money and
-pre-registered claims are on the line; churning the library while the
-gateway is being proven against it is two moving parts where one
-suffices. The gateway itself is immune by construction through strict
-TU partitioning: the ledger seam (gw_ledger.h) passes bare bytes and
-no axilog type crosses it.
+Fix, per the standing ruling: the shadow header is deleted and the
+library adopts the substrate's types.h; axilog/types.h now resolves
+only to axioma-spec's header, so ct_fault_flags_t is one type
+estate-wide. The richer L3 fault set lives in include/axilog/l3_types.h
+as ax_l3_fault_flags_t, following the axioma-l0 Phase 4 pattern
+(l0_errors.h): substrate ct_fault_flags_t embedded as base at offset 0
+(load-bearing for boundary crossings), six L3-specific flags after it,
+16 bytes total, C99 compile-time asserts pinning both sizes and the
+base offset. L3 public signatures (ax_obs_admit, ax_obs_validate,
+ax_validate_and_normalise) take ax_l3_fault_flags_t; boundary locals
+that cross axilog_commit are substrate-typed and initialised with
+ct_fault_init. The q16.16 types and AX_* return codes carry forward
+into l3_types.h unchanged.
+
+The gateway's TU partition (gw_ledger seam passing bare bytes) stays.
+It is defence in depth, not a workaround to be dismantled the moment
+the wound heals.
+
+Verification: tests/test_fault_attribution.c exercises the previously
+untested fault path from an oracle translation unit and proves the
+substrate's domain fault lands in domain, and only domain, both on a
+bare substrate struct and through the L3 wrapper's base; it also
+confirms the out_commit zeroing postcondition and the green path
+writing nothing. The full suite is 19/19 including the new test
+(release and ASAN+UBSAN builds), and the l0 side is 20/20 untouched.
+As a negative control, a translation unit written against the old
+shadow layout no longer compiles: the defect class is now a
+compile-time error, not a runtime misattribution. A side effect worth
+recording: the former arrangement also had both packages installing a
+file at include/axilog/types.h; the install collision is gone with the
+shadow.
+
+Statement 11 now reads without qualification: the fields are uint8_t
+and the layout is the substrate's.
 
 ---
 

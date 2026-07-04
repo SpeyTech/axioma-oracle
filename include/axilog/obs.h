@@ -24,7 +24,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "axilog/types.h"
+#include "axilog/l3_types.h"
 #include "axilog/limits.h"
 #include "axilog/oracle.h"
 
@@ -160,7 +160,7 @@ int ax_obs_admit(
     size_t               output_buf_size,
     const ax_obs_input_t *in,
     ax_admission_ctx_t  *ctx,
-    ct_fault_flags_t    *faults
+    ax_l3_fault_flags_t    *faults
 );
 
 /**
@@ -184,6 +184,6 @@ void ax_obs_init(ax_obs_record_t *obs);
  *
  * @return AX_OK if valid, error code otherwise
  */
-int ax_obs_validate(const ax_obs_record_t *obs, ct_fault_flags_t *faults);
+int ax_obs_validate(const ax_obs_record_t *obs, ax_l3_fault_flags_t *faults);
 
 #endif /* AXILOG_OBS_H */

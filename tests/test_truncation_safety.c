@@ -31,7 +31,7 @@ static void test_output_size_is_original(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     size_t original_size;
     
     TEST("output_size_is_original");
@@ -54,7 +54,7 @@ static void test_output_size_is_original(void)
     ax_oracle_params_init_null(&in.params);
     
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
     
     if (obs.output_size == original_size &&
@@ -73,7 +73,7 @@ static void test_truncation_valid_utf8(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     size_t i;
     
     TEST("truncation_valid_utf8");
@@ -108,7 +108,7 @@ static void test_truncation_valid_utf8(void)
     ax_oracle_params_init_null(&in.params);
     
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
     
     /* The admitted output (truncated) should be valid UTF-8 */
@@ -130,7 +130,7 @@ static void test_truncated_can_be_canonicalised(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     char canonical_buf[AX_CANONICAL_BUFFER_SIZE];
     int len;
     size_t i;
@@ -156,7 +156,7 @@ static void test_truncated_can_be_canonicalised(void)
     ax_oracle_params_init_null(&in.params);
     
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
     
     /* Canonicalisation should succeed */
@@ -175,7 +175,7 @@ static void test_truncation_state_preserved(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     size_t i;
     int result;
     
@@ -199,11 +199,11 @@ static void test_truncation_state_preserved(void)
     ax_oracle_params_init_null(&in.params);
     
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
     
     /* Validation should still pass (hash is over admitted content) */
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     result = ax_obs_validate(&obs, &faults);
     
     if (result == AX_OK && 
@@ -221,7 +221,7 @@ static void test_auditor_can_determine_truncation(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     char canonical_buf[AX_CANONICAL_BUFFER_SIZE];
     size_t i;
     
@@ -245,7 +245,7 @@ static void test_auditor_can_determine_truncation(void)
     ax_oracle_params_init_null(&in.params);
     
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
     
     ax_obs_canonicalise(canonical_buf, sizeof(canonical_buf), &obs, 1);

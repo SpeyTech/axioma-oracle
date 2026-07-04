@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "axilog/obs.h"
-#include "axilog/types.h"
+#include "axilog/l3_types.h"
 
 /* Test counters */
 static int tests_run = 0;
@@ -59,19 +59,19 @@ static void test_ordering_first_admission(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     char output_buf[256];
     int result;
 
     TEST("ordering_first_admission");
 
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     create_test_input(&in, 1);
 
     result = ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
-    if (result == AX_OK && !ct_fault_any(&faults)) {
+    if (result == AX_OK && !ax_l3_fault_any(&faults)) {
         PASS();
     } else {
         FAIL("first admission should succeed");
@@ -83,7 +83,7 @@ static void test_ordering_sequential(void)
     ax_obs_record_t obs1, obs2, obs3;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     char output_buf[256];
     int r1, r2, r3;
 
@@ -91,15 +91,15 @@ static void test_ordering_sequential(void)
 
     ax_admission_ctx_init(&ctx);
 
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     create_test_input(&in, 1);
     r1 = ax_obs_admit(&obs1, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     create_test_input(&in, 2);
     r2 = ax_obs_admit(&obs2, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     create_test_input(&in, 3);
     r3 = ax_obs_admit(&obs3, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
@@ -115,7 +115,7 @@ static void test_ordering_gap_allowed(void)
     ax_obs_record_t obs1, obs2;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     char output_buf[256];
     int r1, r2;
 
@@ -123,12 +123,12 @@ static void test_ordering_gap_allowed(void)
 
     ax_admission_ctx_init(&ctx);
 
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     create_test_input(&in, 1);
     r1 = ax_obs_admit(&obs1, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
     /* Skip to sequence 100 - gaps should be allowed */
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     create_test_input(&in, 100);
     r2 = ax_obs_admit(&obs2, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
@@ -144,7 +144,7 @@ static void test_ordering_regression_fail(void)
     ax_obs_record_t obs1, obs2;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     char output_buf[256];
     int r1, r2;
 
@@ -152,12 +152,12 @@ static void test_ordering_regression_fail(void)
 
     ax_admission_ctx_init(&ctx);
 
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     create_test_input(&in, 10);
     r1 = ax_obs_admit(&obs1, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
     /* Try to go backwards - MUST fail */
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     create_test_input(&in, 5);
     r2 = ax_obs_admit(&obs2, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
@@ -174,7 +174,7 @@ static void test_ordering_duplicate_fail(void)
     ax_obs_record_t obs1, obs2;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     char output_buf[256];
     int r1, r2;
 
@@ -182,12 +182,12 @@ static void test_ordering_duplicate_fail(void)
 
     ax_admission_ctx_init(&ctx);
 
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     create_test_input(&in, 10);
     r1 = ax_obs_admit(&obs1, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
     /* Try same sequence again - MUST fail */
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     create_test_input(&in, 10);
     r2 = ax_obs_admit(&obs2, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
@@ -203,7 +203,7 @@ static void test_ordering_large_sequence(void)
     ax_obs_record_t obs1, obs2;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     char output_buf[256];
     int r1, r2;
 
@@ -211,11 +211,11 @@ static void test_ordering_large_sequence(void)
 
     ax_admission_ctx_init(&ctx);
 
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     create_test_input(&in, 0xFFFFFFFFFFFFFFFEULL);
     r1 = ax_obs_admit(&obs1, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     create_test_input(&in, 0xFFFFFFFFFFFFFFFFULL);
     r2 = ax_obs_admit(&obs2, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
@@ -231,14 +231,14 @@ static void test_ordering_context_update(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     char output_buf[256];
 
     TEST("ordering_context_update");
 
     ax_admission_ctx_init(&ctx);
 
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     create_test_input(&in, 42);
     ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
@@ -260,7 +260,7 @@ static void test_ordering_error_state(void)
     ax_obs_record_t obs;
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     char output_buf[256];
 
     TEST("ordering_error_state");
@@ -268,12 +268,12 @@ static void test_ordering_error_state(void)
     ax_admission_ctx_init(&ctx);
 
     /* First admission */
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     create_test_input(&in, 10);
     ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 
     /* Regression attempt */
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     create_test_input(&in, 5);
     ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
 

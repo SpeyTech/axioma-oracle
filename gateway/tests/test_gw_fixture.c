@@ -57,7 +57,7 @@ int main(void)
     ax_obs_input_t in;
     ax_obs_record_t rec;
     ax_admission_ctx_t adm;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int clen;
 
     printf("gateway: test_gw_fixture\n");

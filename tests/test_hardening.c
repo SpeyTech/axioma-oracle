@@ -81,7 +81,7 @@ static void test_h1_hash_changes_if_not_cleared(void)
     char output_buf[256];
     ax_obs_input_t in;
     ax_admission_ctx_t ctx1, ctx2;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     
     TEST("h1_hash_changes_if_not_cleared");
     
@@ -100,13 +100,13 @@ static void test_h1_hash_changes_if_not_cleared(void)
     
     /* Admit first observation normally */
     ax_admission_ctx_init(&ctx1);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     ax_obs_admit(&obs1, output_buf, sizeof(output_buf), &in, &ctx1, &faults);
     
     /* Create second observation with different ledger_seq */
     in.ledger_seq = 2;
     ax_admission_ctx_init(&ctx2);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     ax_obs_admit(&obs2, output_buf, sizeof(output_buf), &in, &ctx2, &faults);
     
     /* Hashes must be different due to different ledger_seq */
@@ -141,7 +141,7 @@ static void test_h2_canonical_consistency(void)
     
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     
     memset(&in, 0, sizeof(in));
     in.completion_state = AX_COMPLETION_COMPLETE;
@@ -156,7 +156,7 @@ static void test_h2_canonical_consistency(void)
     ax_oracle_params_init_null(&in.params);
     
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
     
     /* Canonicalise directly with obs_hash cleared */
@@ -190,7 +190,7 @@ static void test_h3_ledger_seq_ordering_enforced(void)
     char output_buf[256];
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int result;
     
     TEST("h3_ledger_seq_ordering_enforced");
@@ -208,7 +208,7 @@ static void test_h3_ledger_seq_ordering_enforced(void)
     
     /* Admit first observation with ledger_seq = 10 */
     in.ledger_seq = 10;
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     result = ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
     
     if (result != AX_OK) {
@@ -218,7 +218,7 @@ static void test_h3_ledger_seq_ordering_enforced(void)
     
     /* Attempt to admit with ledger_seq = 5 (regression) - must fail */
     in.ledger_seq = 5;
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     result = ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
     
     if (result == AX_ERR_ORDERING && faults.ordering == 1) {
@@ -238,7 +238,7 @@ static void test_h3_ledger_seq_duplicate_rejected(void)
     char output_buf[256];
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int result;
     
     TEST("h3_ledger_seq_duplicate_rejected");
@@ -256,7 +256,7 @@ static void test_h3_ledger_seq_duplicate_rejected(void)
     ax_admission_ctx_init(&ctx);
     
     /* Admit first */
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     result = ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
     
     if (result != AX_OK) {
@@ -265,7 +265,7 @@ static void test_h3_ledger_seq_duplicate_rejected(void)
     }
     
     /* Attempt duplicate - must fail */
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     result = ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
     
     if (result == AX_ERR_ORDERING && faults.ordering == 1) {
@@ -291,7 +291,7 @@ static void test_h4_invalid_utf8_rejected_before_hash(void)
     char output_buf[256];
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int result;
     
     TEST("h4_invalid_utf8_rejected_before_hash");
@@ -307,7 +307,7 @@ static void test_h4_invalid_utf8_rejected_before_hash(void)
     ax_oracle_params_init_null(&in.params);
     
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     result = ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
     
     /* Must fail with encoding error */
@@ -333,7 +333,7 @@ static void test_h4_control_char_rejected_before_hash(void)
     char output_buf[256];
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int result;
     
     TEST("h4_control_char_rejected_before_hash");
@@ -349,7 +349,7 @@ static void test_h4_control_char_rejected_before_hash(void)
     ax_oracle_params_init_null(&in.params);
     
     ax_admission_ctx_init(&ctx);
-    ct_fault_clear(&faults);
+    ax_l3_fault_init(&faults);
     result = ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
     
     /* Must fail with encoding error */
@@ -370,7 +370,7 @@ static void test_h4_encoding_rejection_totality(void)
     char output_buf[256];
     ax_obs_input_t in;
     ax_admission_ctx_t ctx;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int result;
     int all_rejected = 1;
     
@@ -402,7 +402,7 @@ static void test_h4_encoding_rejection_totality(void)
         ax_oracle_params_init_null(&in.params);
         
         ax_admission_ctx_init(&ctx);
-        ct_fault_clear(&faults);
+        ax_l3_fault_init(&faults);
         result = ax_obs_admit(&obs, output_buf, sizeof(output_buf), &in, &ctx, &faults);
         
         if (result != AX_ERR_ENCODING || faults.encoding != 1) {

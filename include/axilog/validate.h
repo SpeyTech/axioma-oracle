@@ -17,7 +17,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "axilog/types.h"
+#include "axilog/l3_types.h"
 
 /* ========================================================================
  * UTF-8 Validation
@@ -137,7 +137,7 @@ int ax_validate_and_normalise(
     size_t            dst_size,
     const char       *src,
     size_t            src_len,
-    ct_fault_flags_t *faults
+    ax_l3_fault_flags_t *faults
 );
 
 #endif /* AXILOG_VALIDATE_H */

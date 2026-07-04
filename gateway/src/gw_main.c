@@ -146,7 +146,7 @@ static int commit_observation(gw_state_t *st,
 {
     ax_obs_input_t in;
     ax_obs_record_t rec;
-    ct_fault_flags_t faults;
+    ax_l3_fault_flags_t faults;
     int rc, clen;
     uint8_t head[32];
 
@@ -226,7 +226,7 @@ static void handle_request(gw_state_t *st, int cfd, const char *api_key)
 
     /* step 2: validate and normalise; pre-spend reject is final */
     {
-        ct_fault_flags_t f;
+        ax_l3_fault_flags_t f;
         int n;
         memset(&f, 0, sizeof f);
         n = ax_validate_and_normalise(st->norm, (size_t)st->cfg->max_prompt_bytes + 1,

@@ -18,7 +18,7 @@
 #define AXILOG_ORACLE_H
 
 #include <stdint.h>
-#include "axilog/types.h"
+#include "axilog/l3_types.h"
 #include "axilog/limits.h"
 
 /* ========================================================================

@@ -141,6 +141,13 @@ add_executable(test_hardening tests/test_hardening.c)
 target_link_libraries(test_hardening axioma_oracle)
 add_test(NAME test_hardening COMMAND test_hardening)
 
+# Test: Fault Attribution (E-ABI-1 regression)
+# The defect was misattribution across the axilog_commit boundary and
+# nothing previously exercised the fault path; this does.
+add_executable(test_fault_attribution tests/test_fault_attribution.c)
+target_link_libraries(test_fault_attribution axioma_oracle)
+add_test(NAME test_fault_attribution COMMAND test_fault_attribution)
+
 # ==============================================================================
 # Sanitizer Builds (Optional)
 # ==============================================================================
@@ -194,8 +201,8 @@ if(ORACLE_BUILD_GATEWAY)
         CACHE PATH "Path to axioma-audit checkout")
 
     # TU group B: the ledger seam compiles against audit + substrate only.
-    # The oracle's axilog/types.h is a different type under the same name;
-    # keeping the include sets disjoint per TU is load-bearing.
+    # E-ABI-1 is fixed (ct_fault_flags_t is one type estate-wide) but the
+    # disjoint include sets stay: defence in depth, per CONFORMANCE.md §12.
     add_library(gw-ledger STATIC
         gateway/src/gw_ledger.c
         ${AXIOMA_AUDIT_ROOT}/src/ledger.c
