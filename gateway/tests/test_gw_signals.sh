@@ -167,7 +167,7 @@ import socket, sys
 p = b"kill me mid-flight"
 s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 s.connect(sys.argv[1])
-s.sendall(b"max_tokens: 16\nprompt_len: %d\n\n" % len(p) + p)
+s.sendall(b"max_tokens: 16\ntemperature_q16: 0\nprompt_len: %d\n\n" % len(p) + p)
 s.recv(65536)
 PYEOF
 CLIENT_PID=$!

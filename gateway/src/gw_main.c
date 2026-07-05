@@ -214,6 +214,25 @@ static void handle_request(gw_state_t *st, int cfd, const char *api_key)
         return;
     }
     if (max_tokens <= 0 || max_tokens > 200000) { proto_error(cfd, "bad_max_tokens"); return; }
+    /* G1 (server-side invariant): temperature is a REQUIRED pin, not a
+     * client courtesy. The determinism guarantee must be true where the
+     * serving happens, not only in a well-behaved adapter: a hand-built
+     * request, a refuter's reimplementation, or a tired stage-3 wiring
+     * that bypasses the client guard must not be served unpinned. A
+     * request that omits temperature_q16 leaves temp_q16 at its -1
+     * sentinel; reject it, the same shape as the seed rejection above.
+     * top_p stays optional (it does not affect the greedy argmax at
+     * temperature 0 and is not the determinism pin). */
+    if (temp_q16 < 0) {
+        gw_log("warn", "protocol_reject",
+               "temperature_q16 required: unpinned serving refused", -1, -1, 0);
+        proto_error(cfd, "temperature_required");
+        return;
+    }
+    /* G2: a range check, not a one-sided ceiling. temp_q16 is now known
+     * >= 0 (required above); reject the high end. 131072 is 2.0 in
+     * Q16.16. top_p, if present (>= 0), is bounded; if absent it stays
+     * null and is omitted from the provider request. */
     if (temp_q16 > 131072L || top_p_q16 > 65536L) { proto_error(cfd, "bad_param_range"); return; }
     {
         size_t got = 0;
@@ -440,9 +459,28 @@ static void handle_request(gw_state_t *st, int cfd, const char *api_key)
             /* respond */
             {
                 char hdr[512];
+                char temp_str[24];
+                /* Served temperature, reported so the caller records what
+                 * the gateway served rather than only what it asked
+                 * (Grandfather Chair): the two can differ, and a divergence
+                 * belongs on the record. params.temperature is the value
+                 * forwarded to the provider; null (unpinned) reports as
+                 * "null" so an unpinned serve is visible, not disguised as
+                 * a number. Q16.16 integer, matching the request field. */
+                if (ax_params_temperature_is_null(&params))
+                    (void)snprintf(temp_str, sizeof temp_str, "null");
+                else
+                    (void)snprintf(temp_str, sizeof temp_str, "%ld",
+                                   (long)params.temperature);
+                /* snapshot_id echoes the committed model_id: the caller's
+                 * per-response record of exactly which model served the
+                 * request, the same value committed to the oracle record
+                 * (in.model_id). A caller cannot otherwise tell from the
+                 * response which snapshot ran. */
                 int hn = snprintf(hdr, sizeof hdr,
                     "status: %s\ncompletion_state: %s\nfailure_type: %s\n"
-                    "obs_hash: %s\nchain_head: %s\nseq: %llu\noutput_len: %zu\n\n",
+                    "obs_hash: %s\nchain_head: %s\nseq: %llu\n"
+                    "snapshot_id: %s\ntemperature_q16: %s\noutput_len: %zu\n\n",
                     ok_for_caller ? "ok" : "error",
                     state == AX_COMPLETION_COMPLETE ? "COMPLETE" :
                     state == AX_COMPLETION_TRUNCATED ? "TRUNCATED" : "ERROR",
@@ -450,7 +488,8 @@ static void handle_request(gw_state_t *st, int cfd, const char *api_key)
                     ftype == AX_FAILURE_TIMEOUT ? "TIMEOUT" :
                     ftype == AX_FAILURE_INVALID_OUTPUT ? "INVALID_OUTPUT" :
                                                          "TRANSPORT_ERROR",
-                    obs_hash_hex, head_hex, (unsigned long long)seq, output_len);
+                    obs_hash_hex, head_hex, (unsigned long long)seq,
+                    st->cfg->model_id, temp_str, output_len);
                 if (hn > 0 && write_all_fd(cfd, hdr, (size_t)hn) == 0 &&
                     output_len > 0)
                     (void)write_all_fd(cfd, output, output_len);
