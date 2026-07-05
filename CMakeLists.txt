@@ -242,6 +242,13 @@ if(ORACLE_BUILD_GATEWAY)
         ${AXILOG_SDK_ROOT}/lib/libaxilog.a)
     add_test(NAME test_gw_ledger COMMAND test_gw_ledger)
 
+    add_executable(test_gw_export gateway/tests/test_gw_export.c)
+    target_include_directories(test_gw_export PRIVATE
+        gateway/include ${AXIOMA_AUDIT_ROOT}/include ${AXILOG_SDK_ROOT}/include)
+    target_link_libraries(test_gw_export PRIVATE gw-ledger
+        ${AXILOG_SDK_ROOT}/lib/libaxilog.a)
+    add_test(NAME test_gw_export COMMAND test_gw_export)
+
     add_executable(test_gw_wal
         gateway/tests/test_gw_wal.c gateway/src/gw_wal.c)
     target_include_directories(test_gw_wal PRIVATE gateway/include)

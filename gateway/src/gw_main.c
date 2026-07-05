@@ -122,6 +122,7 @@ typedef struct {
     gw_config_t        *cfg;
     ax_admission_ctx_t  adm;
     long                calls_made;   /* spend guard */
+    int                 export_drop_logged; /* export fail-loud, once */
     char               *prompt;       /* malloc'd, max_prompt_bytes */
     char               *norm;         /* normalised prompt */
     char               *escaped;      /* escaped prompt for request JSON */
@@ -456,6 +457,18 @@ static void handle_request(gw_state_t *st, int cfd, const char *api_key)
                 gw_log("error", "fault", "WAL clear failed", -1, -1, seq);
             gw_log("info", "obs_committed", obs_hash_hex, -1, -1, seq);
 
+            /* Export mirror failure is fail-open for serving (the
+             * projection is not the truth) and fail-loud here: log the
+             * transition once, and the witness sees a stale export as
+             * NOT-DISCHARGEABLE. */
+            if (st->cfg->export_path[0] != '\0' && !gwl_export_active()
+                    && !st->export_drop_logged) {
+                gw_log("warn", "export_write_failed",
+                       "ledger export inactive; witness NOT-DISCHARGEABLE"
+                       " until next start", -1, -1, seq);
+                st->export_drop_logged = 1;
+            }
+
             /* respond */
             {
                 char hdr[512];
@@ -603,6 +616,20 @@ int main(int argc, char **argv)
         if (truncated)
             gw_log("warn", "fault", "torn ledger tail truncated under open WAL intent",
                    -1, -1, gwl_seq());
+        /* Serving-determinism witness export (Chair ruling 2026-07-05):
+         * a byte-identical prefix mirror of the primary, rewritten from
+         * the verified replay at every start and appended per commit.
+         * The config-load rule extends here: a config the service
+         * cannot honour refuses to start. */
+        if (cfg.export_path[0] != '\0') {
+            if (gwl_export_enable(cfg.export_path) != 0) {
+                gw_log("error", "fault", "ledger export enable failed",
+                       -1, -1, 0);
+                return 1;
+            }
+            gw_log("info", "export_enabled", cfg.export_path, -1, -1,
+                   gwl_seq());
+        }
     }
     if (recover_wal(&st) != 0) return 1;
 

@@ -41,6 +41,25 @@ int gwl_append(const char *tag, const uint8_t *payload, uint64_t payload_len,
 uint64_t gwl_seq(void);
 void     gwl_head(uint8_t out[32]);
 
+/* Serving-determinism witness export (Chair ruling 2026-07-05).
+ * Enable after a successful gwl_open: (re)writes the export file as a
+ * byte-identical copy of the replayed primary (healing any torn or
+ * stale export from a prior run), mode 0644, then mirrors every
+ * subsequent frame appended by gwl_append. The export carries no
+ * authority: it is a checkable projection of the primary, and the
+ * checker verifies its chain integrity and its head against the
+ * serve-time chain_head echoes. Returns 0 or -1 (a configured export
+ * that cannot be enabled should refuse service; the caller decides).
+ *
+ * Mirror-write failure at append time is fail-open for serving and
+ * fail-loud for witnessing: the export fd is closed, gwl_export_active
+ * drops to 0 (the caller logs the transition), and the stale export is
+ * NOT-DISCHARGEABLE at witness time by the checker's staleness check.
+ * The export is not fsynced per frame; a torn export tail is detected
+ * by the checker and healed at the next enable. */
+int gwl_export_enable(const char *path);
+int gwl_export_active(void);
+
 /* Does the most recent frame's payload contain the given substring?
  * Used by WAL recovery to detect an intent whose observation did land
  * before the crash (payload carries the input_hash hex). */

@@ -42,6 +42,13 @@ typedef struct {
      * Presence of this key is recorded via the config commitment. */
     char fixture_capture_path[GW_PATH_MAX];
 
+    /* Optional: mirror every ledger frame to a read-only export at this
+     * path (serving-determinism witness, Chair ruling 2026-07-05). The
+     * export is a byte-identical prefix of the primary, rewritten from
+     * the primary at startup and appended per commit. Empty = disabled.
+     * Presence and value are recorded via the config commitment. */
+    char export_path[GW_PATH_MAX];
+
     /* Raw file bytes for the startup AX:STATE:v1 commitment. */
     uint8_t raw[GW_CONFIG_MAX];
     size_t  raw_len;

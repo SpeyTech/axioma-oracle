@@ -24,6 +24,7 @@
 
 static ax_ledger_ctx_t g_ctx;
 static int   g_fd = -1;
+static int   g_export_fd = -1;   /* serving-determinism witness export */
 static char  g_last_payload[GWL_PAYLOAD_MAX];
 static size_t g_last_payload_len = 0;
 
@@ -166,6 +167,22 @@ int gwl_append(const char *tag, const uint8_t *payload, uint64_t payload_len,
     if (write_all(g_fd, commit, 32) != 0)                 return -1;
     if (fsync(g_fd) != 0)                                 return -1;
 
+    /* Mirror the identical frame to the witness export. The primary is
+     * already durable; export failure must not refuse serving (the
+     * projection is not the truth), so on any short write the export
+     * drops to inactive and the caller logs the transition. A stale
+     * export is NOT-DISCHARGEABLE at witness time, never a silent pass. */
+    if (g_export_fd >= 0) {
+        if (write_all(g_export_fd, h4, 4) != 0 ||
+            write_all(g_export_fd, tag, tag_len) != 0 ||
+            write_all(g_export_fd, h8, 8) != 0 ||
+            write_all(g_export_fd, payload, (size_t)payload_len) != 0 ||
+            write_all(g_export_fd, commit, 32) != 0) {
+            close(g_export_fd);
+            g_export_fd = -1;
+        }
+    }
+
     ct_fault_init(&cf);
     ax_ledger_append(&g_ctx, commit, &cf);
     if (ct_fault_any(&cf)) return -1;   /* ctx fail-closed; service must stop */
@@ -180,6 +197,42 @@ int gwl_append(const char *tag, const uint8_t *payload, uint64_t payload_len,
 }
 
 uint64_t gwl_seq(void) { return g_ctx.sequence; }
+
+int gwl_export_enable(const char *path)
+{
+    off_t size, off;
+    static uint8_t copy_buf[64 * 1024];
+
+    if (g_fd < 0 || path == NULL || path[0] == '\0') return -1;
+    if (g_export_fd >= 0) { close(g_export_fd); g_export_fd = -1; }
+
+    /* O_TRUNC: the primary, as replayed and verified by gwl_open, is
+     * the truth; whatever a prior run left at the export path (torn
+     * tail from an unsynced frame, stale prefix, garbage) is healed by
+     * rewriting from byte zero. 0644: the export exists to be read by
+     * the witness user; the primary keeps its 0640. */
+    g_export_fd = open(path, O_RDWR | O_CREAT | O_TRUNC, 0644);
+    if (g_export_fd < 0) return -1;
+
+    size = lseek(g_fd, 0, SEEK_CUR);   /* gwl_open left g_fd at the end */
+    if (size < 0) goto fail;
+    for (off = 0; off < size; ) {
+        ssize_t r = pread(g_fd, copy_buf, sizeof copy_buf, off);
+        if (r <= 0) goto fail;
+        if (write_all(g_export_fd, copy_buf, (size_t)r) != 0) goto fail;
+        off += r;
+    }
+    if (fsync(g_export_fd) != 0) goto fail;   /* the baseline copy is synced;
+                                               * per-frame mirrors are not */
+    return 0;
+
+fail:
+    close(g_export_fd);
+    g_export_fd = -1;
+    return -1;
+}
+
+int gwl_export_active(void) { return g_export_fd >= 0; }
 
 void gwl_head(uint8_t out[32]) { memcpy(out, g_ctx.current_hash, 32); }
 
@@ -200,5 +253,6 @@ int gwl_last_payload_contains(const char *needle)
 
 void gwl_close(void)
 {
+    if (g_export_fd >= 0) { close(g_export_fd); g_export_fd = -1; }
     if (g_fd >= 0) { close(g_fd); g_fd = -1; }
 }

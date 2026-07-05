@@ -95,6 +95,7 @@ int gw_config_load(gw_config_t *cfg, const char *path)
             else if (strcmp(key, "model_id")    == 0) rc = set_str(cfg->model_id,  GW_ID_MAX, val);
             else if (strcmp(key, "oracle_id")   == 0) rc = set_str(cfg->oracle_id, GW_ID_MAX, val);
             else if (strcmp(key, "fixture_capture_path") == 0) rc = set_str(cfg->fixture_capture_path, GW_PATH_MAX, val);
+            else if (strcmp(key, "export_path")          == 0) rc = set_str(cfg->export_path, GW_PATH_MAX, val);
             else if (strcmp(key, "connect_timeout_s")  == 0) rc = set_long(&cfg->connect_timeout_s,  val, 1, 600);
             else if (strcmp(key, "response_timeout_s") == 0) rc = set_long(&cfg->response_timeout_s, val, 1, 3600);
             else if (strcmp(key, "max_attempts")       == 0) rc = set_long(&cfg->max_attempts,       val, 1, 10);
