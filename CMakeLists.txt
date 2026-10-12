@@ -311,6 +311,16 @@ if(ORACLE_BUILD_GATEWAY)
     set_tests_properties(test_gw_signals PROPERTIES
         TIMEOUT 120
         SKIP_RETURN_CODE 77)
+
+    # PCR-004 residual (d): the reference client sends the required
+    # temperature_q16 line and its requests are served and committed.
+    add_test(NAME test_gw_client COMMAND sh
+             ${CMAKE_CURRENT_SOURCE_DIR}/gateway/tests/test_gw_client.sh
+             $<TARGET_FILE:axioma-gateway>
+             ${CMAKE_CURRENT_SOURCE_DIR}/gateway/gw-client.py)
+    set_tests_properties(test_gw_client PROPERTIES
+        TIMEOUT 60
+        SKIP_RETURN_CODE 77)
 endif()
 
 # Shell tooling lint gate: scripts are code. Fails loudly when
