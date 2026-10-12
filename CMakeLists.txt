@@ -321,6 +321,16 @@ if(ORACLE_BUILD_GATEWAY)
     set_tests_properties(test_gw_client PROPERTIES
         TIMEOUT 60
         SKIP_RETURN_CODE 77)
+
+    # PCR-004 residual (c): a configuration refused at load makes zero
+    # upstream calls and writes nothing (owner direction 2026-10-12,
+    # Round 7 item 7).
+    add_test(NAME test_gw_config_zero_upstream COMMAND sh
+             ${CMAKE_CURRENT_SOURCE_DIR}/gateway/tests/test_gw_config_zero_upstream.sh
+             $<TARGET_FILE:axioma-gateway>)
+    set_tests_properties(test_gw_config_zero_upstream PROPERTIES
+        TIMEOUT 120
+        SKIP_RETURN_CODE 77)
 endif()
 
 # Shell tooling lint gate: scripts are code. Fails loudly when
