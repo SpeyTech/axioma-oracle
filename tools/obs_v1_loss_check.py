@@ -3,7 +3,8 @@
 # Copyright (C) 2026 Spey Systems Ltd (SC889983)
 #
 # obs_v1_loss_check.py - identify AX:OBS:v1 records produced by the
-# pre-PCR-001 canonicaliser that lost content.
+# pre-PCR-001 canonicaliser that lost content, or that exceed the
+# complete-record size limit.
 #
 # Before PCR-001 (axioma-oracle 57ec02b and earlier), ax_obs_canonicalise
 # wrote "" for output, model_id or oracle_id when escaping overflowed an
@@ -18,6 +19,12 @@
 #   OK                          no loss signature
 #   V1_OUTPUT_LOSS              output is "" while output_size > 0: the
 #                               record is self-identifying as defective
+#   V1_OVER_SIZE_LIMIT          the stored record is longer than 65,536
+#                               bytes (SRS-004-SHALL-048 as amended by
+#                               SRS-004-AMD-001). Its obs_hash may still
+#                               verify; it was admitted by a producer that
+#                               did not enforce the limit and is not a
+#                               conformant record. Reported, never repaired.
 #   V1_IDENTIFIER_UNVERIFIABLE  model_id or oracle_id is "": loss cannot be
 #                               distinguished from a genuinely empty value
 #   NOT_OBS / UNPARSEABLE       not an AX:OBS:v1 record
@@ -33,6 +40,7 @@ import struct
 import sys
 
 OBS_TAG = b"AX:OBS:v1"
+AX_MAX_OBS_BYTES = 65536  # SRS-004-SHALL-048: canonical stored record, bytes
 
 
 def classify(payload):
@@ -45,6 +53,8 @@ def classify(payload):
     if rec.get("output") == "" and isinstance(rec.get("output_size"), int) \
             and rec["output_size"] > 0:
         return "V1_OUTPUT_LOSS"
+    if len(payload) > AX_MAX_OBS_BYTES:
+        return "V1_OVER_SIZE_LIMIT"
     if rec.get("model_id") == "" or rec.get("oracle_id") == "":
         return "V1_IDENTIFIER_UNVERIFIABLE"
     return "OK"

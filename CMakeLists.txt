@@ -141,6 +141,12 @@ add_executable(test_obs_record_max tests/test_obs_record_max.c)
 target_link_libraries(test_obs_record_max axioma_oracle)
 add_test(NAME test_obs_record_max COMMAND test_obs_record_max)
 
+# Historical record classifier boundary (SRS-004-AMD-001): stdlib Python only.
+find_program(PYTHON3_EXE python3 REQUIRED)
+add_test(NAME test_obs_v1_loss_check
+         COMMAND ${PYTHON3_EXE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_obs_v1_loss_check.py
+                 ${CMAKE_CURRENT_SOURCE_DIR}/tools)
+
 # Test: NFC Limitation Documentation
 add_executable(test_nfc_limitation tests/test_nfc_limitation.c)
 target_link_libraries(test_nfc_limitation axioma_oracle)

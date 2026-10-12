@@ -144,6 +144,58 @@ static void test_sweep(void)
     PASS();
 }
 
+/* 5. Exact boundary (SRS-004-AMD-001): a complete record of exactly
+ *    AX_MAX_OBS_BYTES bytes is admitted; AX_MAX_OBS_BYTES + 1 is rejected.
+ *    Built from the largest admissible LF count, padded with 1-byte 'a'
+ *    characters (each adds exactly one canonical byte while output_size
+ *    keeps the same number of digits, checked below). */
+static void fill_lf_pad(size_t lf, size_t pad)
+{
+    memset(out, '\n', lf);
+    memset(out + lf, 'a', pad);
+    out[lf + pad] = '\0';
+}
+
+static void test_exact_boundary(void)
+{
+    ax_obs_record_t rec;
+    ax_l3_fault_flags_t f;
+    size_t n, lo = 0, hi = 13000, pad;
+    int len;
+
+    TEST("record of exactly AX_MAX_OBS_BYTES admitted; AX_MAX_OBS_BYTES + 1 rejected");
+    while (lo < hi) {
+        size_t mid = (lo + hi + 1) / 2;
+        fill_lf_pad(mid, 0);
+        if (admit(&rec, mid, &f) == AX_OK) lo = mid; else hi = mid - 1;
+    }
+    n = lo;
+    fill_lf_pad(n, 0);
+    if (admit(&rec, n, &f) != AX_OK) { FAIL("base not admitted"); return; }
+    len = record_len(&rec);
+    if (len <= 0 || len > AX_MAX_OBS_BYTES) { FAIL("base length wrong"); return; }
+    pad = (size_t)(AX_MAX_OBS_BYTES - len);
+
+    fill_lf_pad(n, pad);
+    if (admit(&rec, n + pad, &f) != AX_OK) { FAIL("exact-limit record not admitted"); return; }
+    len = record_len(&rec);
+    if (len != AX_MAX_OBS_BYTES) { printf("(len %d) ", len); FAIL("record is not exactly AX_MAX_OBS_BYTES"); return; }
+    if (rec.completion_state != AX_COMPLETION_COMPLETE || rec.obs_hash[0] == '\0') {
+        FAIL("exact-limit record not COMPLETE with obs_hash"); return;
+    }
+
+    fill_lf_pad(n, pad + 1);
+    if (admit(&rec, n + pad + 1, &f) != AX_ERR_SIZE || !f.size) {
+        FAIL("AX_MAX_OBS_BYTES + 1 not rejected with AX_ERR_SIZE"); return;
+    }
+    if (rec.completion_state != AX_COMPLETION_ERROR || rec.failure_type != AX_FAILURE_INVALID_OUTPUT
+        || rec.obs_hash[0] != '\0') {
+        FAIL("rejected record state wrong"); return;
+    }
+    printf("(%zu LF + %zu bytes: %d admitted, %d rejected) ", n, pad, AX_MAX_OBS_BYTES, AX_MAX_OBS_BYTES + 1);
+    PASS();
+}
+
 int main(void)
 {
     printf("\n=== SRS-004-SHALL-048 complete-record limit ===\n");
@@ -151,6 +203,7 @@ int main(void)
     test_boundary();
     test_truncated_plain_output_in_bounds();
     test_sweep();
+    test_exact_boundary();
     printf("\nResults: %d/%d tests passed\n", tests_passed, tests_run);
     return tests_passed == tests_run ? 0 : 1;
 }
