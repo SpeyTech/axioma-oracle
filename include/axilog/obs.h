@@ -148,6 +148,8 @@ static inline void ax_admission_ctx_init(ax_admission_ctx_t *ctx) {
  *   - the pair is not COMPLETE/NULL, TRUNCATED/NULL or
  *     ERROR/{TIMEOUT, INVALID_OUTPUT, TRANSPORT_ERROR};
  *   - input is NULL while input_len > 0;
+ *   - output is NULL while output_len > 0 (NULL output with
+ *     output_len == 0 is admitted as an empty output);
  *   - completion_state is ERROR and output_len > AX_MAX_OUTPUT_BYTES
  *     (truncation would otherwise relabel it TRUNCATED and keep the
  *     failure_type, a pair outside the permitted list).

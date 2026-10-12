@@ -153,6 +153,12 @@ add_executable(test_admission_error_oversize tests/test_admission_error_oversize
 target_link_libraries(test_admission_error_oversize axioma_oracle)
 add_test(NAME test_admission_error_oversize COMMAND test_admission_error_oversize)
 
+# PCR-004 residual (b): NULL output with output_len > 0 is rejected; NULL
+# output with output_len == 0 is pinned unchanged (owner direction 2026-10-12).
+add_executable(test_admission_null_output tests/test_admission_null_output.c)
+target_link_libraries(test_admission_null_output axioma_oracle)
+add_test(NAME test_admission_null_output COMMAND test_admission_null_output)
+
 # Historical record classifier boundary (SRS-004-AMD-001): stdlib Python only.
 find_program(PYTHON3_EXE python3 REQUIRED)
 add_test(NAME test_obs_v1_loss_check

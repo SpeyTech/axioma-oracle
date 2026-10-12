@@ -145,6 +145,13 @@ static int input_is_schema_valid(const ax_obs_input_t *in)
     if (in->input == NULL && in->input_len > 0) {
         return 0;
     }
+    /* PCR-004 residual (b): output NULL with output_len > 0 was admitted
+     * as an empty output with output_size 0 (or, over the limit, as an
+     * empty TRUNCATED output with the claimed size). It mirrors the input
+     * rule above. NULL output with output_len == 0 stays admissible. */
+    if (in->output == NULL && in->output_len > 0) {
+        return 0;
+    }
     return 1;
 }
 
