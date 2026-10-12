@@ -141,6 +141,12 @@ add_executable(test_obs_record_max tests/test_obs_record_max.c)
 target_link_libraries(test_obs_record_max axioma_oracle)
 add_test(NAME test_obs_record_max COMMAND test_obs_record_max)
 
+# PCR-004 (B-07): admission fails closed on malformed identifiers, enums,
+# enum pairs and inputs; v1 empty-input hash pinned (owner decision 2026-10-12).
+add_executable(test_admission_fail_closed tests/test_admission_fail_closed.c)
+target_link_libraries(test_admission_fail_closed axioma_oracle)
+add_test(NAME test_admission_fail_closed COMMAND test_admission_fail_closed)
+
 # Historical record classifier boundary (SRS-004-AMD-001): stdlib Python only.
 find_program(PYTHON3_EXE python3 REQUIRED)
 add_test(NAME test_obs_v1_loss_check

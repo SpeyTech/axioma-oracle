@@ -139,6 +139,20 @@ static inline void ax_admission_ctx_init(ax_admission_ctx_t *ctx) {
  *   6. Computes obs_hash
  *   7. Populates the canonical AX:OBS:v1 record
  *
+ * Fails closed (PCR-004, B-07) with AX_ERR_SCHEMA and faults->schema set,
+ * no obs_hash and no change to ctx, when:
+ *   - model_id or oracle_id is NULL or empty;
+ *   - an identifier is not valid UTF-8 or contains a C0 control
+ *     (0x00-0x1F) or DEL (0x7F);
+ *   - completion_state or failure_type is outside its enum;
+ *   - the pair is not COMPLETE/NULL, TRUNCATED/NULL or
+ *     ERROR/{TIMEOUT, INVALID_OUTPUT, TRANSPORT_ERROR};
+ *   - input is NULL while input_len > 0.
+ * The ordering guard (AX_ERR_ORDERING) and the identifier length bound
+ * (AX_ERR_SIZE) are checked first and keep their codes. Empty input
+ * (input_len == 0) is admitted; its input_hash is 32 zero bytes, as in
+ * v1 before PCR-004 (correction deferred to AX:OBS:v2).
+ *
  * SRS-004-SHALL-003: Mandatory admission
  * SRS-004-SHALL-038: Observation ordering guard
  * SRS-004-SHALL-040: Output size enforcement
