@@ -1,5 +1,7 @@
 # Stage 1 CI (proposed; owner-approved approach 2026-10-12). Isolated branch only.
 # Third-party actions are pinned by full commit SHA. No secrets are used.
+# Every checkout sets persist-credentials: false; no job needs git credentials
+# after checkout (no push, no authenticated fetch).
 # Sibling repositories are checked out at pinned SHAs: no undocumented
 # estate state. Known defects on pinned main are asserted explicitly, never
 # hidden behind continue-on-error.
@@ -31,14 +33,17 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          persist-credentials: false
           path: estate/axioma-oracle
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          persist-credentials: false
           repository: SpeyTech/axioma-spec
           ref: ${{ env.SPEC_SHA }}
           path: estate/axioma-spec
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          persist-credentials: false
           repository: SpeyTech/axioma-audit
           ref: ${{ env.AUDIT_SHA }}
           path: estate/axioma-audit
@@ -83,13 +88,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          persist-credentials: false
           path: estate/axioma-oracle
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          persist-credentials: false
           path: estate/oracle-main
           ref: ${{ env.MAIN_SHA }}
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          persist-credentials: false
           repository: SpeyTech/axioma-spec
           ref: ${{ env.SPEC_MAIN_SHA }}
           path: estate/axioma-spec
@@ -103,3 +111,10 @@ jobs:
               build-spec/libaxilog.a -o b01_main
           if ./b01_main; then echo "B-01 no longer reproduces on $MAIN_SHA: update this job"; exit 1; fi
           echo "B-01 reproduces on $MAIN_SHA (expected until PCR-001 merges)"
+      - name: Assert B-07 reproduces on pinned main (PCR-004 test must FAIL there)
+        run: |
+          gcc -std=c99 -O1 -Iestate/oracle-main/include -Iestate/axioma-spec/include \
+              estate/axioma-oracle/tests/test_admission_fail_closed.c estate/oracle-main/src/*.c \
+              build-spec/libaxilog.a -o b07_main
+          if ./b07_main; then echo "B-07 no longer reproduces on $MAIN_SHA: update this job"; exit 1; fi
+          echo "B-07 reproduces on $MAIN_SHA (expected until PCR-004 merges)"
