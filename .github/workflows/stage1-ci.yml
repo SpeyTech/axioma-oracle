@@ -29,15 +29,15 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           path: estate/axioma-oracle
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           repository: SpeyTech/axioma-spec
           ref: ${{ env.SPEC_SHA }}
           path: estate/axioma-spec
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           repository: SpeyTech/axioma-audit
           ref: ${{ env.AUDIT_SHA }}
@@ -81,14 +81,14 @@ jobs:
     # B-01 must still reproduce on the pinned main commit until PCR-001 merges.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           path: estate/axioma-oracle
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           path: estate/oracle-main
           ref: ${{ env.MAIN_SHA }}
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           repository: SpeyTech/axioma-spec
           ref: ${{ env.SPEC_MAIN_SHA }}
