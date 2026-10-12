@@ -155,6 +155,23 @@ static int input_is_schema_valid(const ax_obs_input_t *in)
     return 1;
 }
 
+/*
+ * Identifier check exported for configuration-time use (PCR-004 residual
+ * c). It composes the two rules ax_obs_admit applies to model_id and
+ * oracle_id, in the same order: the length bound (AX_ERR_SIZE), then the
+ * content rule (AX_ERR_SCHEMA). It adds no rule of its own.
+ */
+int ax_obs_identifier_check(const char *id, size_t max_bytes)
+{
+    if (id_too_long(id, max_bytes)) {
+        return AX_ERR_SIZE;
+    }
+    if (!id_is_well_formed(id)) {
+        return AX_ERR_SCHEMA;
+    }
+    return AX_OK;
+}
+
 /**
  * SRS-004-SHALL-003: Mandatory admission
  * SRS-004-SHALL-038: Observation ordering guard

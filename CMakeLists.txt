@@ -288,6 +288,14 @@ if(ORACLE_BUILD_GATEWAY)
     target_include_directories(test_gw_wal PRIVATE gateway/include)
     add_test(NAME test_gw_wal COMMAND test_gw_wal)
 
+    # PCR-004 residual (c): model_id and oracle_id checked at config load
+    # with the admission identifier rules (owner direction 2026-10-12).
+    add_executable(test_gw_config
+        gateway/tests/test_gw_config.c gateway/src/gw_config.c)
+    target_include_directories(test_gw_config PRIVATE gateway/include)
+    target_link_libraries(test_gw_config PRIVATE axioma_oracle)
+    add_test(NAME test_gw_config COMMAND test_gw_config)
+
     add_executable(test_gw_fixture
         gateway/tests/test_gw_fixture.c gateway/src/gw_json.c)
     target_include_directories(test_gw_fixture PRIVATE gateway/include)

@@ -8,6 +8,9 @@ socket_path=/var/lib/axioma-gateway/gw.sock
 ledger_path=/var/lib/axioma-gateway/l6-evidence.bin
 wal_path=/var/lib/axioma-gateway/wal.open
 log_path=/var/lib/axioma-gateway/gw.log
+# model_id and oracle_id are checked at load with the admission rules:
+# non-empty valid UTF-8, no control character (0x00-0x1F) or DEL (0x7F),
+# at most 255 bytes. A config that fails the check is refused.
 model_id=claude-haiku-4-5-20251001
 
 # Provider surface (defaults shown)

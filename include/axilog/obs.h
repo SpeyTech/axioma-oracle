@@ -183,6 +183,21 @@ int ax_obs_admit(
 );
 
 /**
+ * @brief Check an identifier against the admission rules for model_id
+ *        and oracle_id.
+ *
+ * The same rules ax_obs_admit applies, in the same order, for use where
+ * an identifier is fixed before any admission (for example gateway
+ * configuration). Pass AX_MAX_MODEL_ID_BYTES or AX_MAX_ORACLE_ID_BYTES.
+ *
+ * @return AX_OK when admissible;
+ *         AX_ERR_SIZE when longer than max_bytes;
+ *         AX_ERR_SCHEMA when NULL, empty, not valid UTF-8, or containing a
+ *         C0 control (0x00-0x1F) or DEL (0x7F).
+ */
+int ax_obs_identifier_check(const char *id, size_t max_bytes);
+
+/**
  * @brief Initialize an observation record to empty state.
  */
 void ax_obs_init(ax_obs_record_t *obs);

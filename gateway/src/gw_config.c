@@ -3,6 +3,8 @@
  * gw_config.c - see gw_config.h.
  */
 #include "gw_config.h"
+#include "axilog/obs.h"
+#include "axilog/limits.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +15,35 @@ static int set_str(char *dst, size_t cap, const char *v)
     if (n == 0 || n >= cap) return -1;
     memcpy(dst, v, n + 1);
     return 0;
+}
+
+/* PCR-004 residual (c): model_id and oracle_id go into every AX:OBS:v1
+ * record, and admission rejects a malformed identifier with AX_ERR_SCHEMA.
+ * Check them here with the admission validator itself, so a configuration
+ * the gateway could never admit a record under is refused at load, not at
+ * the first request. Returns 0 when admissible, else -1 with a message. */
+static int set_id(char *dst, size_t cap, size_t ax_max, const char *key,
+                  const char *v, int lineno)
+{
+    int rc = ax_obs_identifier_check(v, ax_max);
+    if (rc == AX_ERR_SIZE) {
+        fprintf(stderr, "config:%d: %s is longer than %zu bytes\n",
+                lineno, key, ax_max);
+        return -1;
+    }
+    if (rc != AX_OK) {
+        fprintf(stderr,
+            "config:%d: %s is not an admissible identifier: it must be"
+            " non-empty valid UTF-8 with no control character"
+            " (0x00-0x1F) or DEL (0x7F)\n", lineno, key);
+        return -1;
+    }
+    if (strlen(v) >= cap) {
+        fprintf(stderr, "config:%d: %s is longer than %zu bytes\n",
+                lineno, key, cap - 1);
+        return -1;
+    }
+    return set_str(dst, cap, v);
 }
 
 static int set_long(long *dst, const char *v, long lo, long hi)
@@ -57,6 +88,14 @@ int gw_config_load(gw_config_t *cfg, const char *path)
         fclose(f);
         return -1;
     }
+    /* A NUL byte would end a value early in the line parser below and
+     * silently shorten it (a model_id "m<NUL>x" would load as "m"). No
+     * key takes binary data: refuse the file. */
+    if (memchr(cfg->raw, '\0', cfg->raw_len) != NULL) {
+        fprintf(stderr, "config: %s contains a NUL byte\n", path);
+        fclose(f);
+        return -1;
+    }
     rewind(f);
 
     while (fgets(line, sizeof line, f) != NULL) {
@@ -92,8 +131,20 @@ int gw_config_load(gw_config_t *cfg, const char *path)
             else if (strcmp(key, "log_path")    == 0) rc = set_str(cfg->log_path,    GW_PATH_MAX, val);
             else if (strcmp(key, "api_url")     == 0) rc = set_str(cfg->api_url,     GW_PATH_MAX, val);
             else if (strcmp(key, "anthropic_version") == 0) rc = set_str(cfg->anthropic_version, sizeof cfg->anthropic_version, val);
-            else if (strcmp(key, "model_id")    == 0) rc = set_str(cfg->model_id,  GW_ID_MAX, val);
-            else if (strcmp(key, "oracle_id")   == 0) rc = set_str(cfg->oracle_id, GW_ID_MAX, val);
+            else if (strcmp(key, "model_id")    == 0) {
+                if (set_id(cfg->model_id, GW_ID_MAX, AX_MAX_MODEL_ID_BYTES, key, val, lineno) != 0) {
+                    fclose(f);
+                    return -1;
+                }
+                rc = 0;
+            }
+            else if (strcmp(key, "oracle_id")   == 0) {
+                if (set_id(cfg->oracle_id, GW_ID_MAX, AX_MAX_ORACLE_ID_BYTES, key, val, lineno) != 0) {
+                    fclose(f);
+                    return -1;
+                }
+                rc = 0;
+            }
             else if (strcmp(key, "fixture_capture_path") == 0) rc = set_str(cfg->fixture_capture_path, GW_PATH_MAX, val);
             else if (strcmp(key, "export_path")          == 0) rc = set_str(cfg->export_path, GW_PATH_MAX, val);
             else if (strcmp(key, "connect_timeout_s")  == 0) rc = set_long(&cfg->connect_timeout_s,  val, 1, 600);
