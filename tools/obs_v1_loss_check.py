@@ -3,8 +3,8 @@
 # Copyright (C) 2026 Spey Systems Ltd (SC889983)
 #
 # obs_v1_loss_check.py - identify AX:OBS:v1 records produced by the
-# pre-PCR-001 canonicaliser that lost content, or that exceed the
-# complete-record size limit.
+# pre-PCR-001 canonicaliser that lost content, that exceed the
+# complete-record size limit, or that carry an out-of-range enum.
 #
 # Before PCR-001 (axioma-oracle 57ec02b and earlier), ax_obs_canonicalise
 # wrote "" for output, model_id or oracle_id when escaping overflowed an
@@ -25,8 +25,19 @@
 #                               verify; it was admitted by a producer that
 #                               did not enforce the limit and is not a
 #                               conformant record. Reported, never repaired.
+#   V1_UNKNOWN_ENUM             completion_state or failure_type is the
+#                               string "UNKNOWN": the v1 serialiser writes
+#                               it for a value outside the enum. Admission
+#                               rejects such input since PCR-004 (B-07); a
+#                               historical record of this kind states no
+#                               meaningful outcome. Its obs_hash may still
+#                               verify. Reported, never repaired.
 #   V1_IDENTIFIER_UNVERIFIABLE  model_id or oracle_id is "": loss cannot be
 #                               distinguished from a genuinely empty value
+#
+# A record matching several signatures gets the first in this order:
+# V1_OUTPUT_LOSS, V1_OVER_SIZE_LIMIT, V1_UNKNOWN_ENUM,
+# V1_IDENTIFIER_UNVERIFIABLE.
 #   NOT_OBS / UNPARSEABLE       not an AX:OBS:v1 record
 #
 # Input: a gateway frame file (u32le tag_len | tag | u64le len | payload |
@@ -41,6 +52,7 @@ import sys
 
 OBS_TAG = b"AX:OBS:v1"
 AX_MAX_OBS_BYTES = 65536  # SRS-004-SHALL-048: canonical stored record, bytes
+UNKNOWN_ENUM = "UNKNOWN"   # v1 serialiser output for an out-of-range enum
 
 
 def classify(payload):
@@ -55,6 +67,9 @@ def classify(payload):
         return "V1_OUTPUT_LOSS"
     if len(payload) > AX_MAX_OBS_BYTES:
         return "V1_OVER_SIZE_LIMIT"
+    if rec.get("completion_state") == UNKNOWN_ENUM \
+            or rec.get("failure_type") == UNKNOWN_ENUM:
+        return "V1_UNKNOWN_ENUM"
     if rec.get("model_id") == "" or rec.get("oracle_id") == "":
         return "V1_IDENTIFIER_UNVERIFIABLE"
     return "OK"
