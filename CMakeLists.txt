@@ -136,13 +136,10 @@ add_executable(test_canonical_no_loss tests/test_canonical_no_loss.c)
 target_link_libraries(test_canonical_no_loss axioma_oracle)
 add_test(NAME test_canonical_no_loss COMMAND test_canonical_no_loss)
 
-# KNOWN GAP, tracked explicitly: SRS-004-SHALL-048 record bound is not
-# enforced on the serialised record. WILL_FAIL makes closing the gap turn
-# this red, forcing the registration to be updated. See the source header.
-add_executable(test_obs_record_max_known_gap tests/test_obs_record_max_known_gap.c)
-target_link_libraries(test_obs_record_max_known_gap axioma_oracle)
-add_test(NAME test_obs_record_max_known_gap COMMAND test_obs_record_max_known_gap)
-set_tests_properties(test_obs_record_max_known_gap PROPERTIES WILL_FAIL TRUE LABELS KNOWN_GAP)
+# SRS-004-SHALL-048: complete-record limit enforced (owner decision 2026-10-12).
+add_executable(test_obs_record_max tests/test_obs_record_max.c)
+target_link_libraries(test_obs_record_max axioma_oracle)
+add_test(NAME test_obs_record_max COMMAND test_obs_record_max)
 
 # Test: NFC Limitation Documentation
 add_executable(test_nfc_limitation tests/test_nfc_limitation.c)

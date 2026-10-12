@@ -196,6 +196,23 @@ int ax_obs_admit(
     }
 
     /* ================================================================
+     * SRS-004-SHALL-048: Maximum observation size, enforced on the
+     * complete record as stored (canonical form including obs_hash).
+     * A record over AX_MAX_OBS_BYTES is rejected with AX_ERR_SIZE; it is
+     * not truncated and not relabelled (owner decision 2026-10-12).
+     * ================================================================ */
+    {
+        char record_buf[AX_MAX_OBS_BYTES + 1];
+        if (ax_obs_canonicalise(record_buf, sizeof(record_buf), out, 1) < 0) {
+            faults->size = 1;
+            out->completion_state = AX_COMPLETION_ERROR;
+            out->failure_type = AX_FAILURE_INVALID_OUTPUT;
+            out->obs_hash[0] = '\0';
+            return AX_ERR_SIZE;
+        }
+    }
+
+    /* ================================================================
      * Update admission context
      * ================================================================ */
     ctx->last_ledger_seq = in->ledger_seq;
