@@ -291,6 +291,21 @@ if(ORACLE_BUILD_GATEWAY)
     set_tests_properties(test_gw_signals PROPERTIES
         TIMEOUT 120
         SKIP_RETURN_CODE 77)
+
+    # anthropic_version is copied into an HTTP request header: a control
+    # character in it is refused at configuration load (owner direction
+    # 2026-10-12, Round 7 item 3).
+    add_executable(test_gw_config_header
+        gateway/tests/test_gw_config_header.c gateway/src/gw_config.c)
+    target_include_directories(test_gw_config_header PRIVATE gateway/include)
+    add_test(NAME test_gw_config_header COMMAND test_gw_config_header)
+
+    add_test(NAME test_gw_api_version_header COMMAND sh
+             ${CMAKE_CURRENT_SOURCE_DIR}/gateway/tests/test_gw_api_version_header.sh
+             $<TARGET_FILE:axioma-gateway>)
+    set_tests_properties(test_gw_api_version_header PROPERTIES
+        TIMEOUT 120
+        SKIP_RETURN_CODE 77)
 endif()
 
 # Shell tooling lint gate: scripts are code. Fails loudly when
