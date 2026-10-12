@@ -157,12 +157,12 @@ def classification_cases():
         (rec(completion_state="UNKNOWN", failure_type="UNKNOWN"), "V1_UNKNOWN_ENUM"),
         (rec(completion_state="ERROR", failure_type="UNKNOWN", output="",
              output_size=0), "V1_UNKNOWN_ENUM"),
-        # precedence: loss, then size, then unknown enum, then identifier
+        # precedence: loss, size and identifier (loss_or_corruption) before unknown enum
         (rec(completion_state="UNKNOWN", output="", output_size=5), "V1_OUTPUT_LOSS"),
         (big(completion_state="UNKNOWN"), "V1_OVER_SIZE_LIMIT"),
         (big(failure_type="UNKNOWN", model_id=""), "V1_OVER_SIZE_LIMIT"),
-        (rec(completion_state="UNKNOWN", model_id=""), "V1_UNKNOWN_ENUM"),
-        (rec(failure_type="UNKNOWN", oracle_id=""), "V1_UNKNOWN_ENUM"),
+        (rec(completion_state="UNKNOWN", model_id=""), "V1_IDENTIFIER_UNVERIFIABLE"),
+        (rec(failure_type="UNKNOWN", oracle_id=""), "V1_IDENTIFIER_UNVERIFIABLE"),
         (rec(model_id=""), "V1_IDENTIFIER_UNVERIFIABLE"),
         (rec(oracle_id=""), "V1_IDENTIFIER_UNVERIFIABLE"),
         # every value the v1 serialiser writes for an in-range enum is OK
@@ -191,9 +191,9 @@ def classification_cases():
         (rec(completion_state="UNKNOWN", failure_type="TIMEOUT"), "V1_UNKNOWN_ENUM"),
         (rec(completion_state="COMPLETE", failure_type="UNKNOWN"), "V1_UNKNOWN_ENUM"),
         (rec(completion_state="TRUNCATED", failure_type="TIMEOUT", model_id=""),
-         "V1_FORBIDDEN_STATE_PAIR"),
+         "V1_IDENTIFIER_UNVERIFIABLE"),
         (rec(completion_state="ERROR", failure_type=None, oracle_id=""),
-         "V1_FORBIDDEN_STATE_PAIR"),
+         "V1_IDENTIFIER_UNVERIFIABLE"),
         (rec(completion_state="ERROR", failure_type="TIMEOUT", model_id=""),
          "V1_IDENTIFIER_UNVERIFIABLE"),
         # shapes the v1 serialiser does not write are not judged as pairs
@@ -268,6 +268,17 @@ def check_output(tool, tmp):
         "2 OK", "3 V1_FORBIDDEN_STATE_PAIR",
         "records=2 defects=1 loss_or_corruption=0 schema_anomaly=1"], out))
     results.append(("frames exit status 3", rc == 3, rc))
+    # overlap: a forbidden pair with an empty identifier is labelled by its
+    # loss signature and counted in BOTH categories (neither is hidden)
+    p = os.path.join(tmp, "overlap.jsonl")
+    with open(p, "wb") as f:
+        f.write(rec(completion_state="TRUNCATED", failure_type="TIMEOUT", model_id="") + b"\n"
+                + rec(completion_state="UNKNOWN", oracle_id="") + b"\n")
+    rc, out = run_main(tool, ["x", "--jsonl", p])
+    results.append(("overlap counted in both categories", out == [
+        "1 V1_IDENTIFIER_UNVERIFIABLE", "2 V1_IDENTIFIER_UNVERIFIABLE",
+        "records=2 defects=2 loss_or_corruption=2 schema_anomaly=2"] and rc == 3,
+        (rc, out)))
     # no finding: exit 0, zero counts
     p = os.path.join(tmp, "ok.jsonl")
     with open(p, "wb") as f:

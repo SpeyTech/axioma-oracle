@@ -63,21 +63,20 @@
 #                       but the outcome fields it states are outside the v1
 #                       schema rules that admission now enforces.
 #
-# Precedence. A record matching several signatures gets the first in this
-# order: V1_OUTPUT_LOSS, V1_OVER_SIZE_LIMIT, V1_UNKNOWN_ENUM,
-# V1_FORBIDDEN_STATE_PAIR, V1_IDENTIFIER_UNVERIFIABLE. Content loss and the
-# size violation come first because they mean the record does not commit
-# to, or is not a conformant record of, what was served. V1_UNKNOWN_ENUM
-# precedes V1_FORBIDDEN_STATE_PAIR because a pair can only be judged when
-# both values are in range. Both schema anomalies precede
-# V1_IDENTIFIER_UNVERIFIABLE because they are definite from the record
-# alone, whereas an empty identifier may be genuine. V1_FORBIDDEN_STATE_PAIR
-# was inserted directly after V1_UNKNOWN_ENUM, so every record that matches
-# no forbidden pair keeps the class it had before. A record with both a
-# forbidden pair and an empty identifier reports V1_FORBIDDEN_STATE_PAIR
-# (it was V1_IDENTIFIER_UNVERIFIABLE) and is counted under schema_anomaly;
-# its empty identifier is not reported separately.
-#
+# Precedence. A record can match several signatures. Its per-record label
+# is the first in this order, all loss_or_corruption classes before any
+# schema_anomaly class, so that a possible loss is never hidden behind an
+# anomaly:
+#   V1_OUTPUT_LOSS, V1_OVER_SIZE_LIMIT, V1_IDENTIFIER_UNVERIFIABLE,
+#   V1_UNKNOWN_ENUM, V1_FORBIDDEN_STATE_PAIR.
+# V1_UNKNOWN_ENUM precedes V1_FORBIDDEN_STATE_PAIR because a pair can only
+# be judged when both values are in range. The summary counts each category
+# by signature, not by label: a record with both a loss signature and an
+# anomaly signature is counted in both categories, so neither is hidden.
+# (Owner review 2026-10-12. Before this ordering, a record with an unknown
+# enum and an empty identifier was labelled V1_UNKNOWN_ENUM; it is now
+# labelled V1_IDENTIFIER_UNVERIFIABLE and still counted as schema_anomaly.)
+
 # Input: a gateway frame file (u32le tag_len | tag | u64le len | payload |
 # commit[32]) with --frames, or newline-delimited canonical records with
 # --jsonl.
@@ -85,7 +84,9 @@
 # Output: one line per AX:OBS:v1-tagged record (--frames) or per non-blank
 # line (--jsonl), "<seq> <CLASS>", then one summary line:
 #   records=N defects=D loss_or_corruption=L schema_anomaly=S
-# where D counts records with a V1_ class and D = L + S. The summary starts
+# where D counts records with a V1_ class, L counts records with at least
+# one loss_or_corruption signature and S counts records with at least one
+# schema_anomaly signature (L + S >= D; a record can be in both). The summary starts
 # with "records=N defects=D" exactly as before the categories were added;
 # the category counts are appended after it.
 #
@@ -146,26 +147,33 @@ def is_forbidden_pair(rec):
     return (cs, ft) not in PERMITTED_PAIRS
 
 
-def classify(payload):
+def signatures(payload):
+    """All V1_ signatures of a record in precedence order, or a single
+    non-finding class (OK, NOT_OBS, UNPARSEABLE)."""
     try:
         rec = json.loads(payload.decode("utf-8"))
     except (UnicodeDecodeError, ValueError):
-        return "UNPARSEABLE"
+        return ["UNPARSEABLE"]
     if not isinstance(rec, dict) or rec.get("schema_version") != "AX:OBS:v1":
-        return "NOT_OBS"
+        return ["NOT_OBS"]
+    found = []
     if rec.get("output") == "" and isinstance(rec.get("output_size"), int) \
             and rec["output_size"] > 0:
-        return "V1_OUTPUT_LOSS"
+        found.append("V1_OUTPUT_LOSS")
     if len(payload) > AX_MAX_OBS_BYTES:
-        return "V1_OVER_SIZE_LIMIT"
+        found.append("V1_OVER_SIZE_LIMIT")
+    if rec.get("model_id") == "" or rec.get("oracle_id") == "":
+        found.append("V1_IDENTIFIER_UNVERIFIABLE")
     if rec.get("completion_state") == UNKNOWN_ENUM \
             or rec.get("failure_type") == UNKNOWN_ENUM:
-        return "V1_UNKNOWN_ENUM"
-    if is_forbidden_pair(rec):
-        return "V1_FORBIDDEN_STATE_PAIR"
-    if rec.get("model_id") == "" or rec.get("oracle_id") == "":
-        return "V1_IDENTIFIER_UNVERIFIABLE"
-    return "OK"
+        found.append("V1_UNKNOWN_ENUM")
+    elif is_forbidden_pair(rec):
+        found.append("V1_FORBIDDEN_STATE_PAIR")
+    return found or ["OK"]
+
+
+def classify(payload):
+    return signatures(payload)[0]
 
 
 def frames(path):
@@ -207,11 +215,13 @@ def main(argv):
     defects = 0
     counts = {"loss_or_corruption": 0, "schema_anomaly": 0}
     for seq, payload in items:
-        c = classify(payload)
+        sig = signatures(payload)
+        c = sig[0]
         print("%d %s" % (seq, c))
         if c.startswith("V1_"):
             defects += 1
-            counts[category(c)] += 1
+            for cat in set(category(x) for x in sig):
+                counts[cat] += 1
     print("records=%d defects=%d loss_or_corruption=%d schema_anomaly=%d"
           % (len(items), defects, counts["loss_or_corruption"],
              counts["schema_anomaly"]))
