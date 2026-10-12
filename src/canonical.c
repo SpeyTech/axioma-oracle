@@ -52,14 +52,6 @@ static void write_str(write_ctx_t *ctx, const char *s)
     }
 }
 
-static void write_raw(write_ctx_t *ctx, const char *s, size_t len)
-{
-    size_t i;
-    for (i = 0; i < len; i++) {
-        write_char(ctx, s[i]);
-    }
-}
-
 static int write_finish(write_ctx_t *ctx)
 {
     if (ctx->overflow) {
@@ -192,20 +184,17 @@ int ax_format_hash_hex(char *dst, size_t dst_size, const uint8_t *hash, size_t h
  *
  * Direct UTF-8 for everything else.
  */
-int ax_string_escape(char *dst, size_t dst_size, const char *src, size_t src_len)
+static void write_escaped(write_ctx_t *ctx, const char *src, size_t src_len)
 {
-    write_ctx_t ctx;
     size_t i;
-
-    write_init(&ctx, dst, dst_size);
 
     for (i = 0; i < src_len; i++) {
         unsigned char c = (unsigned char)src[i];
 
         if (c == '"') {
-            write_str(&ctx, "\\\"");
+            write_str(ctx, "\\\"");
         } else if (c == '\\') {
-            write_str(&ctx, "\\\\");
+            write_str(ctx, "\\\\");
         } else if (c < 0x20) {
             /* Control character → \uXXXX */
             char esc[7];
@@ -217,13 +206,20 @@ int ax_string_escape(char *dst, size_t dst_size, const char *src, size_t src_len
             esc[4] = hex[(c >> 4) & 0x0F];
             esc[5] = hex[c & 0x0F];
             esc[6] = '\0';
-            write_str(&ctx, esc);
+            write_str(ctx, esc);
         } else {
             /* Direct UTF-8 */
-            write_char(&ctx, (char)c);
+            write_char(ctx, (char)c);
         }
     }
+}
 
+int ax_string_escape(char *dst, size_t dst_size, const char *src, size_t src_len)
+{
+    write_ctx_t ctx;
+
+    write_init(&ctx, dst, dst_size);
+    write_escaped(&ctx, src, src_len);
     return write_finish(&ctx);
 }
 
@@ -352,9 +348,7 @@ int ax_obs_canonicalise(
     write_ctx_t ctx;
     char num_buf[24];
     char hash_hex[AX_HASH_HEX_SIZE];
-    char escaped[AX_MAX_OUTPUT_BYTES * 2];
     char params_buf[AX_PARAMS_BUFFER_SIZE];
-    int esc_len;
 
     write_init(&ctx, dst, dst_size);
 
@@ -370,23 +364,23 @@ int ax_obs_canonicalise(
 
     /* input_hash */
     write_str(&ctx, ",\"input_hash\":\"");
-    ax_format_hash_hex(hash_hex, sizeof(hash_hex), obs->input_hash, AX_HASH_SIZE);
+    if (ax_format_hash_hex(hash_hex, sizeof(hash_hex), obs->input_hash, AX_HASH_SIZE) < 0) {
+        return AX_ERR_BUFFER;
+    }
     write_str(&ctx, hash_hex);
     write_char(&ctx, '"');
 
     /* ledger_seq */
     write_str(&ctx, ",\"ledger_seq\":");
-    ax_format_uint64(num_buf, sizeof(num_buf), obs->ledger_seq);
+    if (ax_format_uint64(num_buf, sizeof(num_buf), obs->ledger_seq) < 0) {
+        return AX_ERR_BUFFER;
+    }
     write_str(&ctx, num_buf);
 
     /* model_id */
     write_str(&ctx, ",\"model_id\":\"");
     if (obs->model_id) {
-        esc_len = ax_string_escape(escaped, sizeof(escaped),
-                                   obs->model_id, strlen(obs->model_id));
-        if (esc_len > 0) {
-            write_raw(&ctx, escaped, (size_t)esc_len);
-        }
+        write_escaped(&ctx, obs->model_id, strlen(obs->model_id));
     }
     write_char(&ctx, '"');
 
@@ -401,33 +395,29 @@ int ax_obs_canonicalise(
     /* oracle_id */
     write_str(&ctx, ",\"oracle_id\":\"");
     if (obs->oracle_id) {
-        esc_len = ax_string_escape(escaped, sizeof(escaped),
-                                   obs->oracle_id, strlen(obs->oracle_id));
-        if (esc_len > 0) {
-            write_raw(&ctx, escaped, (size_t)esc_len);
-        }
+        write_escaped(&ctx, obs->oracle_id, strlen(obs->oracle_id));
     }
     write_char(&ctx, '"');
 
     /* output */
     write_str(&ctx, ",\"output\":\"");
     if (obs->output) {
-        esc_len = ax_string_escape(escaped, sizeof(escaped),
-                                   obs->output, strlen(obs->output));
-        if (esc_len > 0) {
-            write_raw(&ctx, escaped, (size_t)esc_len);
-        }
+        write_escaped(&ctx, obs->output, strlen(obs->output));
     }
     write_char(&ctx, '"');
 
     /* output_size */
     write_str(&ctx, ",\"output_size\":");
-    ax_format_uint64(num_buf, sizeof(num_buf), obs->output_size);
+    if (ax_format_uint64(num_buf, sizeof(num_buf), obs->output_size) < 0) {
+        return AX_ERR_BUFFER;
+    }
     write_str(&ctx, num_buf);
 
     /* params */
     write_str(&ctx, ",\"params\":");
-    ax_params_canonicalise(params_buf, sizeof(params_buf), &obs->params);
+    if (ax_params_canonicalise(params_buf, sizeof(params_buf), &obs->params) < 0) {
+        return AX_ERR_BUFFER;
+    }
     write_str(&ctx, params_buf);
 
     /* schema_version */

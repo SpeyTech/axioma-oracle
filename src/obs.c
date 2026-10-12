@@ -45,6 +45,22 @@ void ax_obs_init(ax_obs_record_t *obs)
  * Admission
  * ======================================================================== */
 
+/* Bounded strlen: 1 if s is longer than max bytes, else 0. */
+static int id_too_long(const char *s, size_t max)
+{
+    size_t i;
+
+    if (s == NULL) {
+        return 0;
+    }
+    for (i = 0; i <= max; i++) {
+        if (s[i] == '\0') {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 /**
  * SRS-004-SHALL-003: Mandatory admission
  * SRS-004-SHALL-038: Observation ordering guard
@@ -77,6 +93,18 @@ int ax_obs_admit(
         out->completion_state = AX_COMPLETION_ERROR;
         out->failure_type = AX_FAILURE_INVALID_OUTPUT;
         return AX_ERR_ORDERING;
+    }
+
+    /* ================================================================
+     * Identifier bounds (limits.h). Unbounded identifiers were the
+     * easiest trigger of the silent field drop fixed under PCR-001.
+     * ================================================================ */
+    if (id_too_long(in->model_id, AX_MAX_MODEL_ID_BYTES) ||
+        id_too_long(in->oracle_id, AX_MAX_ORACLE_ID_BYTES)) {
+        faults->size = 1;
+        out->completion_state = AX_COMPLETION_ERROR;
+        out->failure_type = AX_FAILURE_INVALID_OUTPUT;
+        return AX_ERR_SIZE;
     }
 
     /* ================================================================

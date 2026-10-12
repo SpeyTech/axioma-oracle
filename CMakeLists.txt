@@ -131,6 +131,19 @@ add_executable(test_truncation_safety tests/test_truncation_safety.c)
 target_link_libraries(test_truncation_safety axioma_oracle)
 add_test(NAME test_truncation_safety COMMAND test_truncation_safety)
 
+# PCR-001: canonical records never silently lose content.
+add_executable(test_canonical_no_loss tests/test_canonical_no_loss.c)
+target_link_libraries(test_canonical_no_loss axioma_oracle)
+add_test(NAME test_canonical_no_loss COMMAND test_canonical_no_loss)
+
+# KNOWN GAP, tracked explicitly: SRS-004-SHALL-048 record bound is not
+# enforced on the serialised record. WILL_FAIL makes closing the gap turn
+# this red, forcing the registration to be updated. See the source header.
+add_executable(test_obs_record_max_known_gap tests/test_obs_record_max_known_gap.c)
+target_link_libraries(test_obs_record_max_known_gap axioma_oracle)
+add_test(NAME test_obs_record_max_known_gap COMMAND test_obs_record_max_known_gap)
+set_tests_properties(test_obs_record_max_known_gap PROPERTIES WILL_FAIL TRUE LABELS KNOWN_GAP)
+
 # Test: NFC Limitation Documentation
 add_executable(test_nfc_limitation tests/test_nfc_limitation.c)
 target_link_libraries(test_nfc_limitation axioma_oracle)
