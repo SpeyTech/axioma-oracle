@@ -291,6 +291,16 @@ if(ORACLE_BUILD_GATEWAY)
     set_tests_properties(test_gw_signals PROPERTIES
         TIMEOUT 120
         SKIP_RETURN_CODE 77)
+
+    # The API key from the environment is copied into an HTTP request
+    # header: a control character in it is refused at startup, and the key
+    # is never printed (Round 7 independent review, item 3).
+    add_test(NAME test_gw_api_key_header COMMAND sh
+             ${CMAKE_CURRENT_SOURCE_DIR}/gateway/tests/test_gw_api_key_header.sh
+             $<TARGET_FILE:axioma-gateway>)
+    set_tests_properties(test_gw_api_key_header PROPERTIES
+        TIMEOUT 120
+        SKIP_RETURN_CODE 77)
 endif()
 
 # Shell tooling lint gate: scripts are code. Fails loudly when
