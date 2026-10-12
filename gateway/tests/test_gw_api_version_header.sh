@@ -168,7 +168,7 @@ def run_case(name, verline, must_load):
                 return "gateway refused the configuration: %s" % msg, note
             if gw.returncode == 0:
                 return "gateway exited 0 without serving", note
-            note = "refused at load (exit %d): %s" % (gw.returncode, msg)
+            note = "refused at load (exit %d): %s; " % (gw.returncode, msg)
         else:
             if not must_load:
                 note = "configuration loaded; "
