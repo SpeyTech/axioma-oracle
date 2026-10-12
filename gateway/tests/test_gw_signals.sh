@@ -22,10 +22,6 @@
 #
 # usage: test_gw_signals.sh <path-to-axioma-gateway-binary>
 
-# SC2317: cleanup() and grep_intent() are reached indirectly (trap and
-# wait_for "$@"); shellcheck's reachability analysis cannot see that.
-# shellcheck disable=SC2317
-
 set -eu
 
 GW_BIN="${1:?usage: test_gw_signals.sh <path-to-axioma-gateway>}"
@@ -41,6 +37,8 @@ HANG_PID=""
 CLIENT_PID=""
 NOTIFY_PID=""
 
+# Reached only through the EXIT/INT/TERM trap below, which ShellCheck cannot follow.
+# shellcheck disable=SC2317,SC2329
 cleanup() {
     if [ -n "${GW_PID}" ];     then kill -KILL "${GW_PID}"     2>/dev/null || true; fi
     if [ -n "${HANG_PID}" ];   then kill -KILL "${HANG_PID}"   2>/dev/null || true; fi
@@ -172,6 +170,8 @@ s.recv(65536)
 PYEOF
 CLIENT_PID=$!
 
+# Called by wait_for as "$@" on the next line, which ShellCheck cannot follow.
+# shellcheck disable=SC2317,SC2329
 grep_intent() { grep -q '"event":"intent"' "${LOG}"; }
 wait_for grep_intent || fail "intent never logged; request did not reach the WAL"
 
