@@ -579,6 +579,10 @@ int main(int argc, char **argv)
         return 1;
     }
     if (gw_config_load(&cfg, argv[1]) != 0) return 1;
+    /* A URL the transfer would refuse is a configuration the service
+     * cannot honour: refuse to start rather than commit a TRANSPORT_ERROR
+     * observation for every request. */
+    if (gwc_url_check("api_url", cfg.api_url) != 0) return 1;
 
     api_key = getenv("AX_ORACLE_ANTHROPIC_KEY");
     if (api_key == NULL || api_key[0] == '\0') {
