@@ -10,8 +10,11 @@ on:
 permissions:
   contents: read
 env:
-  SPEC_SHA: cf728450e5eb12ffa7d3cc6d405cf53c92e00fae
-  AUDIT_SHA: 5c7b05f97679f9e1e638429a9ebf9b6a2817c870
+  # Integration jobs test Stage 1 components together at their intended
+  # revisions. Baseline defect jobs use the *_MAIN_SHA pins only.
+  SPEC_SHA: 39e91e867a710cdecfcf3ebd391f6c566e6fbc4f
+  SPEC_MAIN_SHA: cf728450e5eb12ffa7d3cc6d405cf53c92e00fae
+  AUDIT_SHA: c9789518bdc56a1b8b508c1e507bbfe3902eabec   # axioma-audit stage1 PCR-003 (ledger.c compiled by the gateway)
   MAIN_SHA: 57ec02b661e7b6cf291020508c0d97d95ef21983
 jobs:
   build-test:
@@ -62,6 +65,16 @@ jobs:
                 -DAXILOG_SDK_ROOT="$PWD/sdk-root"
           cmake --build build -j
           ctest --test-dir build --output-on-failure
+      - name: Cross-architecture fingerprint (must equal ci/fingerprints.txt on every matrix entry)
+        run: |
+          cd estate/axioma-oracle
+          SAN="${{ matrix.san }}"
+          ${{ matrix.cc }} -std=c99 -O2 -Wall -Werror $SAN -Iinclude -I"$GITHUB_WORKSPACE/sdk-root/include" \
+              ci/fingerprint.c src/*.c "$GITHUB_WORKSPACE/sdk-root/lib/libaxilog.a" -o "$RUNNER_TEMP/fingerprint"
+          got=$("$RUNNER_TEMP/fingerprint" | sha256sum | cut -d' ' -f1)
+          want=$(cut -d' ' -f1 ci/fingerprints.txt)
+          echo "FINGERPRINT axioma-oracle ${{ matrix.name }} $(uname -m) $got"
+          test "$got" = "$want"
       - name: Historical-record loss checker smoke test
         run: python3 -I estate/axioma-oracle/tools/obs_v1_loss_check.py --jsonl /dev/null
   known-defect-pinned-main:
@@ -78,7 +91,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           repository: SpeyTech/axioma-spec
-          ref: ${{ env.SPEC_SHA }}
+          ref: ${{ env.SPEC_MAIN_SHA }}
           path: estate/axioma-spec
       - name: Build substrate
         run: |
