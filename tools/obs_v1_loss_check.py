@@ -7,6 +7,18 @@
 # complete-record size limit, that carry an out-of-range enum, or that
 # carry a (completion_state, failure_type) pair outside the permitted list.
 #
+# *** BEHAVIOUR CHANGE (forbidden-pair diagnostic, 2026-10-12) ***
+# Callers that act on the exit status or parse the output, read
+# tools/README.md before upgrading. In short:
+#   1. A ledger whose only defect is a forbidden state pair (for example
+#      TRUNCATED/TIMEOUT) exited 0 and now exits 3.
+#   2. The summary line gains " loss_or_corruption=L schema_anomaly=S"
+#      after the unchanged "records=N defects=D" prefix.
+#   3. A record with both an empty identifier and an unknown enum was
+#      labelled V1_UNKNOWN_ENUM and is now V1_IDENTIFIER_UNVERIFIABLE.
+# Exit statuses 0 (no finding), 3 (finding) and 1 (error) keep their
+# meaning; only the set of records that count as a finding grew.
+#
 # Before PCR-001 (axioma-oracle 57ec02b and earlier), ax_obs_canonicalise
 # wrote "" for output, model_id or oracle_id when escaping overflowed an
 # internal buffer, and still returned success. Such records are internally

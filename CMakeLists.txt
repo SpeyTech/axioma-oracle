@@ -152,6 +152,11 @@ find_program(PYTHON3_EXE python3 REQUIRED)
 add_test(NAME test_obs_v1_loss_check
          COMMAND ${PYTHON3_EXE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_obs_v1_loss_check.py
                  ${CMAKE_CURRENT_SOURCE_DIR}/tools)
+# The classifier as its consumers run it: exit status and summary format,
+# including the 0 -> 3 change for forbidden-pair ledgers (tools/README.md).
+add_test(NAME test_obs_v1_loss_check_cli
+         COMMAND ${PYTHON3_EXE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_obs_v1_loss_check_cli.py
+                 ${CMAKE_CURRENT_SOURCE_DIR}/tools/obs_v1_loss_check.py)
 
 # Test: NFC Limitation Documentation
 add_executable(test_nfc_limitation tests/test_nfc_limitation.c)
