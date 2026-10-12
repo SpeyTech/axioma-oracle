@@ -75,6 +75,6 @@ line and produce no observation.
 ## Log
 
 JSON lines at `log_path`. The `message` field is upstream-verbatim
-(curl error strings, Anthropic error messages); the API key is
+(curl error strings, provider error messages); the API key is
 scrubbed at the formatting layer. This log is the harvest source for
 the EXP-1 error-string corpus.
