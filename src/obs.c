@@ -131,6 +131,17 @@ static int input_is_schema_valid(const ax_obs_input_t *in)
     if (!state_pair_is_permitted(in->completion_state, in->failure_type)) {
         return 0;
     }
+    /* PCR-004 residual (a): an ERROR input whose output exceeds
+     * AX_MAX_OUTPUT_BYTES would be relabelled TRUNCATED by the SHALL-040
+     * truncation below while keeping its failure_type, giving a record
+     * pair outside the permitted list (TRUNCATED/TIMEOUT and so on).
+     * Reject it here, before truncation can relabel it. COMPLETE and
+     * TRUNCATED inputs are not affected: SHALL-040 truncation of those
+     * is unchanged. */
+    if ((int)in->completion_state == (int)AX_COMPLETION_ERROR &&
+        in->output_len > AX_MAX_OUTPUT_BYTES) {
+        return 0;
+    }
     if (in->input == NULL && in->input_len > 0) {
         return 0;
     }

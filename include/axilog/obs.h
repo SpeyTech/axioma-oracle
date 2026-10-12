@@ -147,7 +147,10 @@ static inline void ax_admission_ctx_init(ax_admission_ctx_t *ctx) {
  *   - completion_state or failure_type is outside its enum;
  *   - the pair is not COMPLETE/NULL, TRUNCATED/NULL or
  *     ERROR/{TIMEOUT, INVALID_OUTPUT, TRANSPORT_ERROR};
- *   - input is NULL while input_len > 0.
+ *   - input is NULL while input_len > 0;
+ *   - completion_state is ERROR and output_len > AX_MAX_OUTPUT_BYTES
+ *     (truncation would otherwise relabel it TRUNCATED and keep the
+ *     failure_type, a pair outside the permitted list).
  * The ordering guard (AX_ERR_ORDERING) and the identifier length bound
  * (AX_ERR_SIZE) are checked first and keep their codes. Empty input
  * (input_len == 0) is admitted; its input_hash is 32 zero bytes, as in

@@ -147,6 +147,12 @@ add_executable(test_admission_fail_closed tests/test_admission_fail_closed.c)
 target_link_libraries(test_admission_fail_closed axioma_oracle)
 add_test(NAME test_admission_fail_closed COMMAND test_admission_fail_closed)
 
+# PCR-004 residual (a): ERROR input with output over AX_MAX_OUTPUT_BYTES is
+# rejected before truncation can relabel it (owner direction 2026-10-12).
+add_executable(test_admission_error_oversize tests/test_admission_error_oversize.c)
+target_link_libraries(test_admission_error_oversize axioma_oracle)
+add_test(NAME test_admission_error_oversize COMMAND test_admission_error_oversize)
+
 # Historical record classifier boundary (SRS-004-AMD-001): stdlib Python only.
 find_program(PYTHON3_EXE python3 REQUIRED)
 add_test(NAME test_obs_v1_loss_check
