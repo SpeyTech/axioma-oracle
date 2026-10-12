@@ -8,8 +8,8 @@
  *
  * Before this correction, output == NULL with output_len > 0 was admitted
  * as an empty output with output_size 0, and over AX_MAX_OUTPUT_BYTES as
- * an empty TRUNCATED output carrying the claimed size. The record then
- * committed to an output that was never supplied. Owner direction
+ * an empty TRUNCATED output, also with output_size 0. The claimed length
+ * was silently dropped. Owner direction
  * 2026-10-12: reject with AX_ERR_SCHEMA (faults->schema, no obs_hash,
  * sequence not advanced). NULL output with output_len == 0 stays
  * admissible exactly as before: section B pins the full v1 record and
