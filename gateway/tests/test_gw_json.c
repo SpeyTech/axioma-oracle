@@ -98,6 +98,69 @@ int main(void)
               "gwj_escape control and quotes");
     }
 
+    /* gwj_escape_utf8: byte-identical to gwj_escape on well-formed
+     * UTF-8, every C0 control escaped, quotes and backslashes escaped,
+     * multi-byte sequences copied unchanged */
+    {
+        char src[64];
+        char e1[512], e2[512];
+        int i, n1, n2, ctl_ok = 1;
+        const char inj[] = "x\",\"temperature\":2,\"y\":\"";
+        const char inj_esc[] = "x\\\",\\\"temperature\\\":2,\\\"y\\\":\\\"";
+        const char u8[] = "mod\xc3\xa8le-\xe2\x98\x83-\xf0\x9f\x8e\xb4";
+        for (i = 0; i < 32; i++) src[i] = (char)i;
+        n1 = gwj_escape(e1, sizeof e1, src, 32);
+        n2 = gwj_escape_utf8(e2, sizeof e2, src, 32);
+        for (i = 0; i < n2; i++)
+            if ((unsigned char)e2[i] < 0x20) ctl_ok = 0;
+        CHECK(n1 > 0 && n1 == n2 && memcmp(e1, e2, (size_t)n1) == 0 && ctl_ok,
+              "escape_utf8: C0 controls, same as gwj_escape");
+        n2 = gwj_escape_utf8(e2, sizeof e2, inj, sizeof inj - 1);
+        CHECK(n2 == (int)sizeof inj_esc - 1 &&
+              memcmp(e2, inj_esc, (size_t)n2) == 0,
+              "escape_utf8: injection attempt stays a string");
+        n2 = gwj_escape_utf8(e2, sizeof e2, "a\"b\\c", 5);
+        CHECK(n2 == 7 && memcmp(e2, "a\\\"b\\\\c", 7) == 0,
+              "escape_utf8: quote and backslash");
+        n2 = gwj_escape_utf8(e2, sizeof e2, u8, sizeof u8 - 1);
+        CHECK(n2 == (int)sizeof u8 - 1 && memcmp(e2, u8, (size_t)n2) == 0,
+              "escape_utf8: valid UTF-8 passed through");
+        CHECK(gwj_escape_utf8(e2, sizeof e2, "", 0) == 0,
+              "escape_utf8: empty string");
+        CHECK(gwj_escape_utf8(e2, 6, "a\"b\\c", 5) == -1,
+              "escape_utf8: dst too small rejected");
+    }
+
+    /* gwj_escape_utf8 rejects every malformed UTF-8 form */
+    {
+        static const struct { const char *s; size_t n; const char *name; } bad[] = {
+            { "\x80",             1, "lone continuation" },
+            { "\xff",             1, "0xFF" },
+            { "\xc0\x80",         2, "overlong NUL" },
+            { "\xc1\xbf",         2, "overlong 2-byte" },
+            { "\xe0\x80\x80",     3, "overlong 3-byte" },
+            { "\xf0\x80\x80\x80", 4, "overlong 4-byte" },
+            { "\xed\xa0\x80",     3, "UTF-16 surrogate" },
+            { "\xf4\x90\x80\x80", 4, "above U+10FFFF" },
+            { "\xf5\x80\x80\x80", 4, "lead byte 0xF5" },
+            { "a\xc3",            2, "truncated 2-byte" },
+            { "\xe2\x98",         2, "truncated 3-byte" },
+            { "\xc3\x28",         2, "bad continuation" },
+        };
+        char e[64];
+        size_t i;
+        int all = 1;
+        for (i = 0; i < sizeof bad / sizeof bad[0]; i++) {
+            if (gwj_escape_utf8(e, sizeof e, bad[i].s, bad[i].n) != -1) {
+                printf("    accepted: %s\n", bad[i].name);
+                all = 0;
+            }
+        }
+        CHECK(all, "escape_utf8: malformed UTF-8 rejected");
+        CHECK(gwj_escape_utf8(e, sizeof e, "\xed\x9f\xbf\xf4\x8f\xbf\xbf", 7) == 7,
+              "escape_utf8: U+D7FF and U+10FFFF accepted");
+    }
+
     printf("%s\n", failures == 0 ? "ALL PASS" : "FAILURES");
     return failures == 0 ? 0 : 1;
 }

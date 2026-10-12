@@ -16,6 +16,18 @@
  * UTF-8 (the caller validates before this point). */
 int gwj_escape(char *dst, size_t cap, const char *src, size_t len);
 
+/* As gwj_escape, but first checks that src is well-formed UTF-8
+ * (RFC 3629: shortest form only, no UTF-16 surrogates, nothing above
+ * U+10FFFF) and returns -1 if it is not, so the result is always valid
+ * JSON string content whatever the caller passes. For well-formed
+ * input the output is byte-identical to gwj_escape: '"' and '\\' are
+ * backslash-escaped, \n \r \t use the short forms, every other byte
+ * below 0x20 is written as \u00XX, and everything else (including
+ * multi-byte UTF-8 sequences) is copied unchanged. Use this for every
+ * caller- or configuration-supplied string inserted into a JSON body.
+ * Returns bytes written, or -1 on invalid UTF-8 or dst too small. */
+int gwj_escape_utf8(char *dst, size_t cap, const char *src, size_t len);
+
 /* Extract the concatenated text of every content block with
  * "type":"text" from a Messages API response body. Full unescape
  * including \uXXXX and surrogate pairs. Returns 0 on success, -1 on
