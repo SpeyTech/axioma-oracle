@@ -331,6 +331,15 @@ if(ORACLE_BUILD_GATEWAY)
     set_tests_properties(test_gw_config_zero_upstream PROPERTIES
         TIMEOUT 120
         SKIP_RETURN_CODE 77)
+
+    # The upstream request body stays well-formed JSON for any configured
+    # model_id (quotes, backslashes, JSON fragments); local stand-in API.
+    add_test(NAME test_gw_request_json COMMAND sh
+             ${CMAKE_CURRENT_SOURCE_DIR}/gateway/tests/test_gw_request_json.sh
+             $<TARGET_FILE:axioma-gateway>)
+    set_tests_properties(test_gw_request_json PROPERTIES
+        TIMEOUT 120
+        SKIP_RETURN_CODE 77)
 endif()
 
 # Shell tooling lint gate: scripts are code. Fails loudly when

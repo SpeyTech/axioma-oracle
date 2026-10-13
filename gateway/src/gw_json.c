@@ -43,6 +43,45 @@ int gwj_escape(char *dst, size_t cap, const char *src, size_t len)
     return (int)o;
 }
 
+/* Length of the well-formed UTF-8 sequence at s[0..len), or 0 if the
+ * bytes there are not one (RFC 3629, Table 3-7 of the Unicode
+ * standard: no overlong forms, no surrogates, nothing above U+10FFFF,
+ * no truncated sequence). */
+static size_t utf8_seq_len(const unsigned char *s, size_t len)
+{
+    unsigned char c = s[0];
+    if (c < 0x80) return 1;
+    if (c >= 0xC2 && c <= 0xDF) {
+        return (len >= 2 && (s[1] & 0xC0) == 0x80) ? 2 : 0;
+    }
+    if (c >= 0xE0 && c <= 0xEF) {
+        unsigned char lo = (c == 0xE0) ? 0xA0 : 0x80;
+        unsigned char hi = (c == 0xED) ? 0x9F : 0xBF;
+        return (len >= 3 && s[1] >= lo && s[1] <= hi &&
+                (s[2] & 0xC0) == 0x80) ? 3 : 0;
+    }
+    if (c >= 0xF0 && c <= 0xF4) {
+        unsigned char lo = (c == 0xF0) ? 0x90 : 0x80;
+        unsigned char hi = (c == 0xF4) ? 0x8F : 0xBF;
+        return (len >= 4 && s[1] >= lo && s[1] <= hi &&
+                (s[2] & 0xC0) == 0x80 && (s[3] & 0xC0) == 0x80) ? 4 : 0;
+    }
+    return 0;
+}
+
+int gwj_escape_utf8(char *dst, size_t cap, const char *src, size_t len)
+{
+    const unsigned char *u = (const unsigned char *)src;
+    size_t i = 0;
+    if (src == NULL && len > 0) return -1;
+    while (i < len) {
+        size_t n = utf8_seq_len(u + i, len - i);
+        if (n == 0) return -1;
+        i += n;
+    }
+    return gwj_escape(dst, cap, src, len);
+}
+
 /* ---- scanning primitives ---------------------------------------------- */
 
 typedef struct { const char *p; const char *end; } scan_t;

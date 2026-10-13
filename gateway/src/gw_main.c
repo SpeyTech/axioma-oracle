@@ -33,6 +33,7 @@
 #include <axilog/canonical.h>
 #include <axilog/limits.h>
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -75,6 +76,33 @@ static int q16_to_dec(char *dst, size_t cap, int32_t q)
     ip = v >> 16;
     fp = (uint32_t)(((uint64_t)(v & 0xFFFFu) * 1000000u) >> 16);
     return (snprintf(dst, cap, "%u.%06u", ip, fp) < (int)cap) ? 0 : -1;
+}
+
+/* Capacity of the upstream request body buffer: the escaped prompt
+ * (at most 6 bytes per input byte), the escaped model_id (at most 6
+ * bytes per byte of a GW_ID_MAX buffer) and 1024 bytes for the fixed
+ * members and numbers. */
+static size_t gw_reqjson_cap(const gw_config_t *cfg)
+{
+    return (size_t)cfg->max_prompt_bytes * 6 + (size_t)GW_ID_MAX * 6 + 1024;
+}
+
+/* Append formatted text at buf[*off], bounded by the remaining
+ * capacity. Returns 0, or -1 (and leaves *off unchanged) if the text
+ * does not fit or formatting fails: a truncated body is never sent. */
+static int req_put(char *buf, size_t cap, size_t *off, const char *fmt, ...)
+    __attribute__((format(printf, 4, 5)));
+static int req_put(char *buf, size_t cap, size_t *off, const char *fmt, ...)
+{
+    va_list ap;
+    int w;
+    if (*off >= cap) return -1;
+    va_start(ap, fmt);
+    w = vsnprintf(buf + *off, cap - *off, fmt, ap);
+    va_end(ap);
+    if (w < 0 || (size_t)w >= cap - *off) return -1;
+    *off += (size_t)w;
+    return 0;
 }
 
 /* ---- line protocol ------------------------------------------------------
@@ -301,31 +329,57 @@ static void handle_request(gw_state_t *st, int cfd, const char *api_key)
         }
         gw_log("info", "intent", input_hash_hex, -1, -1, gwl_seq() + 1u);
 
-        /* build request body */
+        /* build request body. Every caller- or configuration-supplied
+         * string (model_id from the configuration, the normalised
+         * prompt from the caller) is inserted only through
+         * gwj_escape_utf8, so the body is well-formed JSON whatever
+         * those strings contain: a quote, backslash or control
+         * character in model_id can no longer end the string early or
+         * add members to the request object. The numeric members are
+         * formatted from integers. The record committed below is built
+         * from the unescaped values and is not affected. A string that
+         * cannot be escaped (not well-formed UTF-8) or a body that does
+         * not fit fails closed before any network I/O. */
         {
-            int en = gwj_escape(st->escaped, (size_t)st->cfg->max_prompt_bytes * 6 + 1,
-                                st->norm, (size_t)prompt_len);
-            if (en < 0) {
+            char model_esc[GW_ID_MAX * 6 + 1];
+            size_t cap = gw_reqjson_cap(st->cfg);
+            size_t off = 0;
+            int mn = gwj_escape_utf8(model_esc, sizeof model_esc,
+                                     st->cfg->model_id,
+                                     strlen(st->cfg->model_id));
+            int en = gwj_escape_utf8(st->escaped,
+                                     (size_t)st->cfg->max_prompt_bytes * 6 + 1,
+                                     st->norm, (size_t)prompt_len);
+            int ok = (mn >= 0 && en >= 0);
+            if (ok)
+                ok = req_put(st->reqjson, cap, &off,
+                             "{\"model\":\"%.*s\",\"max_tokens\":%ld",
+                             mn, model_esc, (long)params.max_tokens) == 0;
+            if (ok && !ax_params_temperature_is_null(&params)) {
+                char dec[24];
+                ok = q16_to_dec(dec, sizeof dec, params.temperature) == 0 &&
+                     req_put(st->reqjson, cap, &off,
+                             ",\"temperature\":%s", dec) == 0;
+            }
+            if (ok && !ax_params_top_p_is_null(&params)) {
+                char dec[24];
+                ok = q16_to_dec(dec, sizeof dec, params.top_p) == 0 &&
+                     req_put(st->reqjson, cap, &off,
+                             ",\"top_p\":%s", dec) == 0;
+            }
+            if (ok)
+                ok = req_put(st->reqjson, cap, &off,
+                             ",\"messages\":[{\"role\":\"user\",\"content\":\"%.*s\"}]}",
+                             en, st->escaped) == 0;
+            if (!ok) {
+                gw_log("error", "fault",
+                       "request body build failed (identifier or prompt not escapable)",
+                       -1, -1, 0);
                 (void)gw_wal_clear(st->cfg->wal_path);
                 proto_error(cfd, "internal");
                 return;
             }
-            n = snprintf(st->reqjson, (size_t)st->cfg->max_prompt_bytes * 6 + 1024,
-                "{\"model\":\"%s\",\"max_tokens\":%ld",
-                st->cfg->model_id, (long)params.max_tokens);
-            if (!ax_params_temperature_is_null(&params)) {
-                char dec[24];
-                (void)q16_to_dec(dec, sizeof dec, params.temperature);
-                n += snprintf(st->reqjson + n, 64, ",\"temperature\":%s", dec);
-            }
-            if (!ax_params_top_p_is_null(&params)) {
-                char dec[24];
-                (void)q16_to_dec(dec, sizeof dec, params.top_p);
-                n += snprintf(st->reqjson + n, 64, ",\"top_p\":%s", dec);
-            }
-            n += snprintf(st->reqjson + n, (size_t)en + 128,
-                ",\"messages\":[{\"role\":\"user\",\"content\":\"%.*s\"}]}",
-                en, st->escaped);
+            n = (int)off;
         }
 
         /* step 5: the oracle call; every path from here yields one obs */
@@ -597,7 +651,7 @@ int main(int argc, char **argv)
     st.prompt  = malloc((size_t)cfg.max_prompt_bytes + 1);
     st.norm    = malloc((size_t)cfg.max_prompt_bytes + 1);
     st.escaped = malloc((size_t)cfg.max_prompt_bytes * 6 + 1);
-    st.reqjson = malloc((size_t)cfg.max_prompt_bytes * 6 + 1024);
+    st.reqjson = malloc(gw_reqjson_cap(&cfg));
     if (!st.prompt || !st.norm || !st.escaped || !st.reqjson) {
         fprintf(stderr, "allocation failure\n");
         return 1;

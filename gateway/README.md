@@ -59,6 +59,17 @@ observation is on the chain either way. Pre-spend rejections
 (encoding, budget, protocol) return `status: error` with a `reason`
 line and produce no observation.
 
+Upstream request body: the gateway sends the oracle API one JSON object
+with the members `model`, `max_tokens`, optional `temperature` and
+`top_p`, and `messages`. The configured `model_id` and the normalised
+prompt are JSON-escaped (`"` and `\` backslash-escaped, `\n` `\r` `\t`
+in short form, other characters below 0x20 as `\u00XX`, well-formed
+UTF-8 copied unchanged), so no configured or supplied string can end a
+string early or add members. A string that is not well-formed UTF-8 is
+not sent: the request fails with `reason: internal` before any network
+I/O. Escaping applies to the HTTP request only; the committed record
+carries the unescaped values as before.
+
 ## Evidence and durability
 
 - `ledger_path` is the append-only evidence file: framed records
