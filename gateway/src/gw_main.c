@@ -525,7 +525,22 @@ static void handle_request(gw_state_t *st, int cfd, const char *api_key)
 
             /* respond */
             {
-                char hdr[512];
+                /* Worst case, with the longest value of every field:
+                 *   "status: error\n"                        14
+                 *   "completion_state: TRUNCATED\n"          28
+                 *   "failure_type: TRANSPORT_ERROR\n"        30
+                 *   "obs_hash: " 64 hex "\n"                 75
+                 *   "chain_head: " 64 hex "\n"               77
+                 *   "seq: " 20 digits "\n"                   26
+                 *   "snapshot_id: " model_id "\n"            14 + (GW_ID_MAX - 1)
+                 *   "temperature_q16: " 23 chars "\n"        41
+                 *   "output_len: " 20 digits "\n"            33
+                 *   "\n" and the terminating NUL               2
+                 * = 340 + (GW_ID_MAX - 1); 384 + GW_ID_MAX covers it. The
+                 * buffer was 512 bytes, which a model_id of 248 bytes or
+                 * more overflowed (a truncated header, and a write of the
+                 * untruncated length past the buffer). */
+                char hdr[384 + GW_ID_MAX];
                 char temp_str[24];
                 /* Served temperature, reported so the caller records what
                  * the gateway served rather than only what it asked
@@ -557,7 +572,14 @@ static void handle_request(gw_state_t *st, int cfd, const char *api_key)
                                                          "TRANSPORT_ERROR",
                     obs_hash_hex, head_hex, (unsigned long long)seq,
                     st->cfg->model_id, temp_str, output_len);
-                if (hn > 0 && write_all_fd(cfd, hdr, (size_t)hn) == 0 &&
+                if (hn < 0 || (size_t)hn >= sizeof hdr) {
+                    /* Unreachable by the bound above; never send a cut
+                     * header or read past the buffer. The record is
+                     * already committed. */
+                    gw_log("error", "fault", "response header exceeds buffer",
+                           -1, -1, seq);
+                    proto_error(cfd, "internal");
+                } else if (write_all_fd(cfd, hdr, (size_t)hn) == 0 &&
                     output_len > 0)
                     (void)write_all_fd(cfd, output, output_len);
             }
