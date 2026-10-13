@@ -71,6 +71,9 @@ static void backoff_sleep(int attempt, long retry_after_s)
     }
 }
 
+/* The only protocols a transfer may use (CURLOPT_PROTOCOLS_STR). */
+#define GWC_PROTOCOLS "http,https"
+
 int gwc_url_check(const char *key, const char *url)
 {
     CURLU *u;
@@ -89,9 +92,9 @@ int gwc_url_check(const char *key, const char *url)
     }
     rc = curl_url_set(u, CURLUPART_URL, url,
                       CURLU_GUESS_SCHEME | CURLU_NON_SUPPORT_SCHEME);
-    curl_url_cleanup(u);
-    curl_global_cleanup();
     if (rc != CURLUE_OK) {
+        curl_url_cleanup(u);
+        curl_global_cleanup();
         /* The value is not echoed: it may hold control characters. */
         fprintf(stderr,
             "config: %s is not a URL the HTTP client accepts (%s); it may"
@@ -99,7 +102,25 @@ int gwc_url_check(const char *key, const char *url)
             " a host\n", key, curl_url_strerror(rc));
         return -1;
     }
-    return 0;
+    {
+        /* Transfers carry the API key and the prompt: HTTP or HTTPS only.
+         * The scheme is the one libcurl will use, after any guess for a
+         * schemeless URL (a host starting "ftp." is guessed as ftp), and
+         * is reported in lower case. gwc_call enforces the same set on
+         * every transfer (GWC_PROTOCOLS). */
+        char *scheme = NULL;
+        int ok = curl_url_get(u, CURLUPART_SCHEME, &scheme, 0) == CURLUE_OK &&
+                 scheme != NULL &&
+                 (strcmp(scheme, "http") == 0 || strcmp(scheme, "https") == 0);
+        if (!ok)
+            fprintf(stderr,
+                "config: %s scheme is \"%.16s\"; the gateway transmits only"
+                " over http or https\n", key, scheme ? scheme : "?");
+        curl_free(scheme);
+        curl_url_cleanup(u);
+        curl_global_cleanup();
+        return ok ? 0 : -1;
+    }
 }
 
 int gwc_global_init(void)
@@ -158,6 +179,21 @@ int gwc_call(const gw_config_t *cfg, const char *api_key,
         curl_easy_setopt(h, CURLOPT_TIMEOUT, cfg->response_timeout_s);
         /* TLS verification on: curl defaults, never toggled. */
         curl_easy_setopt(h, CURLOPT_NOSIGNAL, 1L);
+        /* HTTP or HTTPS only, whatever api_url says: the request carries
+         * the API key and the prompt. Redirects are not followed
+         * (CURLOPT_FOLLOWLOCATION is never set), so no redirect protocol
+         * list is needed. A libcurl that cannot apply the restriction
+         * fails the call rather than transfer unrestricted. */
+        if (curl_easy_setopt(h, CURLOPT_PROTOCOLS_STR, GWC_PROTOCOLS)
+                != CURLE_OK) {
+            curl_slist_free_all(headers);
+            curl_easy_cleanup(h);
+            res->outcome = GWC_TRANSPORT;
+            (void)snprintf(res->errbuf, sizeof res->errbuf,
+                           "libcurl cannot restrict protocols to %s",
+                           GWC_PROTOCOLS);
+            return 0;
+        }
 
         rc = curl_easy_perform(h);
         (void)curl_easy_getinfo(h, CURLINFO_RESPONSE_CODE, &status);
