@@ -376,6 +376,15 @@ if(ORACLE_BUILD_GATEWAY)
     set_tests_properties(test_gw_api_key_header PROPERTIES
         TIMEOUT 120
         SKIP_RETURN_CODE 77)
+
+    # An api_url the HTTP client cannot parse is refused at startup, using
+    # libcurl's own URL parser (Round 7 independent review, item 3).
+    add_test(NAME test_gw_api_url COMMAND sh
+             ${CMAKE_CURRENT_SOURCE_DIR}/gateway/tests/test_gw_api_url.sh
+             $<TARGET_FILE:axioma-gateway>)
+    set_tests_properties(test_gw_api_url PROPERTIES
+        TIMEOUT 120
+        SKIP_RETURN_CODE 77)
 endif()
 
 # Shell tooling lint gate: scripts are code. Fails loudly when

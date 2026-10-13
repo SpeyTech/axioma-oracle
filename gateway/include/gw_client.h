@@ -43,6 +43,14 @@ int gwc_call(const gw_config_t *cfg, const char *api_key,
 
 void gwc_result_free(gwc_result_t *res);
 
+/* Check, at startup, that url is one the transfer will accept: libcurl's
+ * own URL parser with the flags a transfer uses (scheme guessing on, any
+ * scheme name accepted), so the accepted set is the transfer's, not a new
+ * grammar. Rejects, among others, any control character, DEL, a space and
+ * a missing host. Returns 0 when accepted, else -1 with a message on
+ * stderr. Self-contained: may be called before gwc_global_init. */
+int  gwc_url_check(const char *key, const char *url);
+
 /* Global curl init/cleanup, once per process. */
 int  gwc_global_init(void);
 void gwc_global_cleanup(void);

@@ -71,6 +71,37 @@ static void backoff_sleep(int attempt, long retry_after_s)
     }
 }
 
+int gwc_url_check(const char *key, const char *url)
+{
+    CURLU *u;
+    CURLUcode rc;
+
+    /* Reference-counted: paired here, and again by gwc_global_init. */
+    if (curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK) {
+        fprintf(stderr, "config: curl init failed checking %s\n", key);
+        return -1;
+    }
+    u = curl_url();
+    if (u == NULL) {
+        curl_global_cleanup();
+        fprintf(stderr, "config: out of memory checking %s\n", key);
+        return -1;
+    }
+    rc = curl_url_set(u, CURLUPART_URL, url,
+                      CURLU_GUESS_SCHEME | CURLU_NON_SUPPORT_SCHEME);
+    curl_url_cleanup(u);
+    curl_global_cleanup();
+    if (rc != CURLUE_OK) {
+        /* The value is not echoed: it may hold control characters. */
+        fprintf(stderr,
+            "config: %s is not a URL the HTTP client accepts (%s); it may"
+            " not contain control characters, DEL or spaces and must name"
+            " a host\n", key, curl_url_strerror(rc));
+        return -1;
+    }
+    return 0;
+}
+
 int gwc_global_init(void)
 {
     srand((unsigned int)(time(NULL) ^ (unsigned int)getpid()));
