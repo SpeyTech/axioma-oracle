@@ -640,6 +640,31 @@ static int recover_wal(gw_state_t *st)
     return gw_wal_clear(st->cfg->wal_path);
 }
 
+/* ---- startup checks ------------------------------------------------------ */
+
+/* The API key is copied into the "x-api-key:" HTTP request header line
+ * (gw_client.c). RFC 9110 section 5.5: a field value never holds CR, LF
+ * or NUL, and HTAB is its only permitted control. A key needs none, so
+ * any C0 control (0x00-0x1F) or DEL (0x7F) refuses startup, as for the
+ * configured API version. Returns 0 when acceptable, else -1 with a
+ * message that names the byte value only: never the key or a position
+ * in it. */
+static int api_key_check(const char *key)
+{
+    const unsigned char *p;
+    for (p = (const unsigned char *)key; *p != '\0'; p++) {
+        if (*p < 0x20 || *p == 0x7F) {
+            fprintf(stderr,
+                "AX_ORACLE_ANTHROPIC_KEY contains control character 0x%02X;"
+                " it is sent as an HTTP header value and may not contain any"
+                " control character (0x00-0x1F) or DEL (0x7F)\n",
+                (unsigned)*p);
+            return -1;
+        }
+    }
+    return 0;
+}
+
 /* ---- main ---------------------------------------------------------------- */
 
 int main(int argc, char **argv)
@@ -661,6 +686,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "AX_ORACLE_ANTHROPIC_KEY not set\n");
         return 1;
     }
+    if (api_key_check(api_key) != 0) return 1;
 
     if (gw_log_open(cfg.log_path, api_key) != 0) {
         fprintf(stderr, "cannot open log %s\n", cfg.log_path);
