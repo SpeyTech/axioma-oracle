@@ -300,6 +300,21 @@ if(ORACLE_BUILD_GATEWAY)
     set_tests_properties(test_gw_api_url PROPERTIES
         TIMEOUT 120
         SKIP_RETURN_CODE 77)
+
+    # Transfers use HTTP or HTTPS only: at startup (scheme check) and on
+    # every transfer (CURLOPT_PROTOCOLS_STR) (owner decision D5, 2026-10-13).
+    add_executable(test_gw_client_protocols
+        gateway/tests/test_gw_client_protocols.c gateway/src/gw_client.c)
+    target_include_directories(test_gw_client_protocols PRIVATE gateway/include)
+    target_link_libraries(test_gw_client_protocols PRIVATE CURL::libcurl)
+    add_test(NAME test_gw_client_protocols COMMAND test_gw_client_protocols)
+
+    add_test(NAME test_gw_api_url_scheme COMMAND sh
+             ${CMAKE_CURRENT_SOURCE_DIR}/gateway/tests/test_gw_api_url_scheme.sh
+             $<TARGET_FILE:axioma-gateway>)
+    set_tests_properties(test_gw_api_url_scheme PROPERTIES
+        TIMEOUT 180
+        SKIP_RETURN_CODE 77)
 endif()
 
 # Shell tooling lint gate: scripts are code. Fails loudly when
