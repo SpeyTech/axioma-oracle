@@ -46,6 +46,35 @@ static int set_id(char *dst, size_t cap, size_t ax_max, const char *key,
     return set_str(dst, cap, v);
 }
 
+/* anthropic_version is copied into the "anthropic-version:" HTTP request
+ * header line (gw_client.c). The line parser strips only trailing CR/LF,
+ * so a CR inside the value would reach the wire and start a new header.
+ * RFC 9110 section 5.5: a field value never holds CR, LF or NUL, and its
+ * only permitted control is HTAB between visible characters. A version
+ * token needs none, so every C0 control (0x00-0x1F) and DEL (0x7F) is
+ * refused, as the AX:OBS:v1 identifier rule refuses them. Returns 0 when
+ * the value is acceptable, else -1 with a message. */
+static int set_header_value(char *dst, size_t cap, const char *key,
+                            const char *v, int lineno)
+{
+    const unsigned char *p;
+    for (p = (const unsigned char *)v; *p != '\0'; p++) {
+        if (*p < 0x20 || *p == 0x7F) {
+            fprintf(stderr,
+                "config:%d: %s contains control character 0x%02X; it is"
+                " sent as an HTTP header value and may not contain any"
+                " control character (0x00-0x1F) or DEL (0x7F)\n",
+                lineno, key, (unsigned)*p);
+            return -1;
+        }
+    }
+    if (set_str(dst, cap, v) != 0) {
+        fprintf(stderr, "config:%d: bad value for '%s'\n", lineno, key);
+        return -1;
+    }
+    return 0;
+}
+
 static int set_long(long *dst, const char *v, long lo, long hi)
 {
     char *end = NULL;
@@ -130,7 +159,13 @@ int gw_config_load(gw_config_t *cfg, const char *path)
             else if (strcmp(key, "wal_path")    == 0) rc = set_str(cfg->wal_path,    GW_PATH_MAX, val);
             else if (strcmp(key, "log_path")    == 0) rc = set_str(cfg->log_path,    GW_PATH_MAX, val);
             else if (strcmp(key, "api_url")     == 0) rc = set_str(cfg->api_url,     GW_PATH_MAX, val);
-            else if (strcmp(key, "anthropic_version") == 0) rc = set_str(cfg->anthropic_version, sizeof cfg->anthropic_version, val);
+            else if (strcmp(key, "anthropic_version") == 0) {
+                if (set_header_value(cfg->anthropic_version, sizeof cfg->anthropic_version, key, val, lineno) != 0) {
+                    fclose(f);
+                    return -1;
+                }
+                rc = 0;
+            }
             else if (strcmp(key, "model_id")    == 0) {
                 if (set_id(cfg->model_id, GW_ID_MAX, AX_MAX_MODEL_ID_BYTES, key, val, lineno) != 0) {
                     fclose(f);

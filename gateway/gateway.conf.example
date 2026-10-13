@@ -15,6 +15,8 @@ model_id=claude-haiku-4-5-20251001
 
 # Provider surface (defaults shown)
 #api_url=https://api.anthropic.com/v1/messages
+# anthropic_version is sent as an HTTP header value: a control character
+# (0x00-0x1F) or DEL (0x7F) in it is refused at load.
 #anthropic_version=2023-06-01
 #oracle_id=anthropic-messages-api
 
