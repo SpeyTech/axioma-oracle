@@ -382,4 +382,3 @@ and the layout is the substrate's.
 
 *axioma-oracle — SRS-004 v0.3 VERIFIED CONFORMANT*
 *SpeyTech · April 2026*
-*Patent GB2521625.0*

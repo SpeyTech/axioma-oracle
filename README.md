@@ -204,8 +204,6 @@ Copyright (c) 2026 Spey Systems LTD
 
 SPDX-License-Identifier: AGPL-3.0-or-later
 
-Patent: UK GB2521625.0
-
 ## Related Documents
 
 - SRS-004 v0.3 — Oracle Boundary Gateway Contract
