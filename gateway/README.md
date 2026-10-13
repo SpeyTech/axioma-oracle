@@ -51,6 +51,8 @@ Response: header lines, a blank line, then the output bytes.
     obs_hash: <64 hex>
     chain_head: <64 hex>
     seq: 4
+    snapshot_id: <configured model_id>
+    temperature_q16: 0
     output_len: 49
 
 Failures return `status: error` with the failure taxonomy in
@@ -69,6 +71,36 @@ string early or add members. A string that is not well-formed UTF-8 is
 not sent: the request fails with `reason: internal` before any network
 I/O. Escaping applies to the HTTP request only; the committed record
 carries the unescaped values as before.
+
+### Response framing (normative for clients)
+
+- The header is a sequence of lines, each terminated by a single LF
+  byte (0x0A). There is no CR. An empty line (LF LF) ends the header;
+  exactly `output_len` bytes of output follow it.
+- Each header line is `key`, then the two bytes `": "`, then the value.
+  The value is every byte after `": "` up to, not including, the LF. It
+  is not quoted, escaped or trimmed. Split on the first `": "` only: a
+  value may itself contain `:`.
+- A served request sends these keys in this order: `status`,
+  `completion_state`, `failure_type`, `obs_hash`, `chain_head`, `seq`,
+  `snapshot_id`, `temperature_q16`, `output_len`. A pre-spend refusal
+  sends `status` and `reason` only. Ignore keys you do not know.
+- Values are UTF-8. `snapshot_id` is the configured `model_id`
+  byte for byte, the value committed as `model_id` in the
+  `AX:OBS:v1` record. The configuration check at startup guarantees it
+  is non-empty, valid UTF-8, at most 255 bytes, and holds no C0
+  control character or DEL, so it never contains LF or CR. It may
+  contain spaces, including trailing ones (the configuration parser
+  trims only leading blanks), and any other Unicode character,
+  including U+0085, U+2028 and U+2029.
+- `temperature_q16` is the temperature the gateway served, as a Q16.16
+  integer, or `null` when the request left it unpinned.
+
+A client must therefore split the header on the byte LF only, decode
+values as strict UTF-8, and keep values exactly as received. Splitting
+on Unicode line boundaries (for example Python `str.splitlines()`),
+trimming values, or decoding with replacement can change
+`snapshot_id`; do not do any of them.
 
 ## Evidence and durability
 
