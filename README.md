@@ -6,11 +6,11 @@ A cryptographic containment boundary for non-deterministic systems.
 
 ## Overview
 
-`axioma-oracle` implements the Oracle Boundary Gateway Contract defined in SRS-004 v0.3. It transforms non-deterministic oracle outputs (LLMs, ML models, external APIs) into immutable, canonical, ordered evidence before they can influence deterministic computation.
+`axioma-oracle` implements the Oracle Boundary Gateway Contract defined in SRS-004 v0.3. It transforms non-deterministic oracle outputs (non-deterministic inference systems, ML models, external APIs) into immutable, canonical, ordered evidence before they can influence deterministic computation.
 
 **Governing Principle:**
 
-> LLMs are not trusted. They are recorded.
+> Inference outputs are not trusted. They are recorded.
 > Inference is not execution. Inference is evidence.
 
 ## Features
@@ -102,8 +102,8 @@ memset(&in, 0, sizeof(in));
 in.completion_state = AX_COMPLETION_COMPLETE;
 in.failure_type = AX_FAILURE_NULL;
 in.ledger_seq = 42;
-in.oracle_id = "azure-openai-prod";
-in.model_id = "gpt-4-turbo-2024-04-09";
+in.oracle_id = "inference-provider-prod";
+in.model_id = "model-2024-04-09";
 in.input = "What is the meaning of life?";
 in.input_len = 28;
 in.output = "The answer is 42.";

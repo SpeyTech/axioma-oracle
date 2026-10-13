@@ -45,6 +45,98 @@ void ax_obs_init(ax_obs_record_t *obs)
  * Admission
  * ======================================================================== */
 
+/* Bounded strlen: 1 if s is longer than max bytes, else 0. */
+static int id_too_long(const char *s, size_t max)
+{
+    size_t i;
+
+    if (s == NULL) {
+        return 0;
+    }
+    for (i = 0; i <= max; i++) {
+        if (s[i] == '\0') {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/* ========================================================================
+ * PCR-004 (B-07): fail-closed schema checks on the admission input
+ * ======================================================================== */
+
+/*
+ * Identifier content rule: non-NULL, non-empty, valid UTF-8 (RFC 3629, the
+ * same validator used for output), and no C0 control (0x00-0x1F, LF
+ * included) or DEL (0x7F). NFC is not required for identifiers.
+ * Precondition: the caller has already bounded the length (id_too_long),
+ * so strlen() here scans at most AX_MAX_*_ID_BYTES + 1 bytes.
+ */
+static int id_is_well_formed(const char *s)
+{
+    size_t i;
+    size_t n;
+
+    if (s == NULL || s[0] == '\0') {
+        return 0;
+    }
+    n = strlen(s);
+    for (i = 0; i < n; i++) {
+        unsigned char c = (unsigned char)s[i];
+        if (c < 0x20 || c == 0x7F) {
+            return 0;
+        }
+    }
+    return ax_validate_utf8(s, n);
+}
+
+/*
+ * Permitted (completion_state, failure_type) pairs:
+ *   COMPLETE / NULL
+ *   TRUNCATED / NULL
+ *   ERROR / {TIMEOUT, INVALID_OUTPUT, TRANSPORT_ERROR}
+ * Any value outside its declared enum is rejected by the same switch.
+ * The comparisons are done on int so that out-of-range values stored in
+ * the enum object are handled without relying on the enum's range.
+ */
+static int state_pair_is_permitted(ax_completion_state_t state,
+                                   ax_failure_type_t ftype)
+{
+    int s = (int)state;
+    int f = (int)ftype;
+
+    if (s == (int)AX_COMPLETION_COMPLETE || s == (int)AX_COMPLETION_TRUNCATED) {
+        return f == (int)AX_FAILURE_NULL;
+    }
+    if (s == (int)AX_COMPLETION_ERROR) {
+        return f == (int)AX_FAILURE_TIMEOUT ||
+               f == (int)AX_FAILURE_INVALID_OUTPUT ||
+               f == (int)AX_FAILURE_TRANSPORT_ERROR;
+    }
+    return 0;
+}
+
+/*
+ * Returns 1 when the admission input is schema-valid, else 0.
+ * Empty input (input_len == 0, input NULL or not) is allowed: its
+ * input_hash stays as v1 computes it (32 zero bytes). Correcting that to
+ * SHA-256 of the empty string is deferred to AX:OBS:v2.
+ */
+static int input_is_schema_valid(const ax_obs_input_t *in)
+{
+    if (!id_is_well_formed(in->model_id) ||
+        !id_is_well_formed(in->oracle_id)) {
+        return 0;
+    }
+    if (!state_pair_is_permitted(in->completion_state, in->failure_type)) {
+        return 0;
+    }
+    if (in->input == NULL && in->input_len > 0) {
+        return 0;
+    }
+    return 1;
+}
+
 /**
  * SRS-004-SHALL-003: Mandatory admission
  * SRS-004-SHALL-038: Observation ordering guard
@@ -77,6 +169,38 @@ int ax_obs_admit(
         out->completion_state = AX_COMPLETION_ERROR;
         out->failure_type = AX_FAILURE_INVALID_OUTPUT;
         return AX_ERR_ORDERING;
+    }
+
+    /* ================================================================
+     * Identifier bounds (limits.h). Unbounded identifiers were the
+     * easiest trigger of the silent field drop fixed under PCR-001.
+     * ================================================================ */
+    if (id_too_long(in->model_id, AX_MAX_MODEL_ID_BYTES) ||
+        id_too_long(in->oracle_id, AX_MAX_ORACLE_ID_BYTES)) {
+        faults->size = 1;
+        out->completion_state = AX_COMPLETION_ERROR;
+        out->failure_type = AX_FAILURE_INVALID_OUTPUT;
+        return AX_ERR_SIZE;
+    }
+
+    /* ================================================================
+     * PCR-004 (B-07): fail closed on malformed input.
+     *
+     * Check order, chosen so that every case rejected before PCR-004
+     * keeps its error code:
+     *   1. ordering guard           -> AX_ERR_ORDERING (unchanged)
+     *   2. identifier length bound  -> AX_ERR_SIZE     (unchanged)
+     *   3. schema checks (here)     -> AX_ERR_SCHEMA   (new)
+     *   4. output encoding, record size and the rest (unchanged)
+     * The length bound runs before the identifier content scan, so the
+     * scan is bounded. Nothing below this point has run on rejection:
+     * no obs_hash is computed and the admission context is not touched.
+     * ================================================================ */
+    if (!input_is_schema_valid(in)) {
+        faults->schema = 1;
+        out->completion_state = AX_COMPLETION_ERROR;
+        out->failure_type = AX_FAILURE_INVALID_OUTPUT;
+        return AX_ERR_SCHEMA;
     }
 
     /* ================================================================
@@ -165,6 +289,23 @@ int ax_obs_admit(
     if (result != AX_OK) {
         faults->protocol = 1;
         return result;
+    }
+
+    /* ================================================================
+     * SRS-004-SHALL-048: Maximum observation size, enforced on the
+     * complete record as stored (canonical form including obs_hash).
+     * A record over AX_MAX_OBS_BYTES is rejected with AX_ERR_SIZE; it is
+     * not truncated and not relabelled (owner decision 2026-10-12).
+     * ================================================================ */
+    {
+        char record_buf[AX_MAX_OBS_BYTES + 1];
+        if (ax_obs_canonicalise(record_buf, sizeof(record_buf), out, 1) < 0) {
+            faults->size = 1;
+            out->completion_state = AX_COMPLETION_ERROR;
+            out->failure_type = AX_FAILURE_INVALID_OUTPUT;
+            out->obs_hash[0] = '\0';
+            return AX_ERR_SIZE;
+        }
     }
 
     /* ================================================================

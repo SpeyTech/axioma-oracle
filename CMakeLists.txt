@@ -131,6 +131,28 @@ add_executable(test_truncation_safety tests/test_truncation_safety.c)
 target_link_libraries(test_truncation_safety axioma_oracle)
 add_test(NAME test_truncation_safety COMMAND test_truncation_safety)
 
+# PCR-001: canonical records never silently lose content.
+add_executable(test_canonical_no_loss tests/test_canonical_no_loss.c)
+target_link_libraries(test_canonical_no_loss axioma_oracle)
+add_test(NAME test_canonical_no_loss COMMAND test_canonical_no_loss)
+
+# SRS-004-SHALL-048: complete-record limit enforced (owner decision 2026-10-12).
+add_executable(test_obs_record_max tests/test_obs_record_max.c)
+target_link_libraries(test_obs_record_max axioma_oracle)
+add_test(NAME test_obs_record_max COMMAND test_obs_record_max)
+
+# PCR-004 (B-07): admission fails closed on malformed identifiers, enums,
+# enum pairs and inputs; v1 empty-input hash pinned (owner decision 2026-10-12).
+add_executable(test_admission_fail_closed tests/test_admission_fail_closed.c)
+target_link_libraries(test_admission_fail_closed axioma_oracle)
+add_test(NAME test_admission_fail_closed COMMAND test_admission_fail_closed)
+
+# Historical record classifier boundary (SRS-004-AMD-001): stdlib Python only.
+find_program(PYTHON3_EXE python3 REQUIRED)
+add_test(NAME test_obs_v1_loss_check
+         COMMAND ${PYTHON3_EXE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_obs_v1_loss_check.py
+                 ${CMAKE_CURRENT_SOURCE_DIR}/tools)
+
 # Test: NFC Limitation Documentation
 add_executable(test_nfc_limitation tests/test_nfc_limitation.c)
 target_link_libraries(test_nfc_limitation axioma_oracle)

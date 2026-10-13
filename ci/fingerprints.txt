@@ -1,0 +1,1 @@
+a9f1f120ff1a408f515c37a762384d692f23c1956da3af81eb53ecffc8a501d3  ci/fingerprint.c output (x86_64 reference: GCC 13 -O2, Clang 18 -O2 and GCC ASan+UBSan agree). Re-pinned for PCR-004: cases 317 and 318 (empty model_id, empty oracle_id) are now rejected with AX_ERR_SCHEMA; the other 327 lines are unchanged from 9c52260ef36a6f7ebc63dfa6eee6d352a2103b78ca16be0b454155b3352c0dfe
