@@ -47,7 +47,9 @@ void gwc_result_free(gwc_result_t *res);
  * own URL parser with the flags a transfer uses (scheme guessing on, any
  * scheme name accepted), so the accepted set is the transfer's, not a new
  * grammar. Rejects, among others, any control character, DEL, a space and
- * a missing host. Returns 0 when accepted, else -1 with a message on
+ * a missing host. The resulting scheme, after any guess, must be http or
+ * https: transfers carry the API key and the prompt, and gwc_call uses no
+ * other protocol. Returns 0 when accepted, else -1 with a message on
  * stderr. Self-contained: may be called before gwc_global_init. */
 int  gwc_url_check(const char *key, const char *url);
 
