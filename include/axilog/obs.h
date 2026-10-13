@@ -147,7 +147,12 @@ static inline void ax_admission_ctx_init(ax_admission_ctx_t *ctx) {
  *   - completion_state or failure_type is outside its enum;
  *   - the pair is not COMPLETE/NULL, TRUNCATED/NULL or
  *     ERROR/{TIMEOUT, INVALID_OUTPUT, TRANSPORT_ERROR};
- *   - input is NULL while input_len > 0.
+ *   - input is NULL while input_len > 0;
+ *   - output is NULL while output_len > 0 (NULL output with
+ *     output_len == 0 is admitted as an empty output);
+ *   - completion_state is ERROR and output_len > AX_MAX_OUTPUT_BYTES
+ *     (truncation would otherwise relabel it TRUNCATED and keep the
+ *     failure_type, a pair outside the permitted list).
  * The ordering guard (AX_ERR_ORDERING) and the identifier length bound
  * (AX_ERR_SIZE) are checked first and keep their codes. Empty input
  * (input_len == 0) is admitted; its input_hash is 32 zero bytes, as in
@@ -176,6 +181,21 @@ int ax_obs_admit(
     ax_admission_ctx_t  *ctx,
     ax_l3_fault_flags_t    *faults
 );
+
+/**
+ * @brief Check an identifier against the admission rules for model_id
+ *        and oracle_id.
+ *
+ * The same rules ax_obs_admit applies, in the same order, for use where
+ * an identifier is fixed before any admission (for example gateway
+ * configuration). Pass AX_MAX_MODEL_ID_BYTES or AX_MAX_ORACLE_ID_BYTES.
+ *
+ * @return AX_OK when admissible;
+ *         AX_ERR_SIZE when longer than max_bytes;
+ *         AX_ERR_SCHEMA when NULL, empty, not valid UTF-8, or containing a
+ *         C0 control (0x00-0x1F) or DEL (0x7F).
+ */
+int ax_obs_identifier_check(const char *id, size_t max_bytes);
 
 /**
  * @brief Initialize an observation record to empty state.

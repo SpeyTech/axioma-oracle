@@ -147,6 +147,18 @@ add_executable(test_admission_fail_closed tests/test_admission_fail_closed.c)
 target_link_libraries(test_admission_fail_closed axioma_oracle)
 add_test(NAME test_admission_fail_closed COMMAND test_admission_fail_closed)
 
+# PCR-004 residual (a): ERROR input with output over AX_MAX_OUTPUT_BYTES is
+# rejected before truncation can relabel it (owner direction 2026-10-12).
+add_executable(test_admission_error_oversize tests/test_admission_error_oversize.c)
+target_link_libraries(test_admission_error_oversize axioma_oracle)
+add_test(NAME test_admission_error_oversize COMMAND test_admission_error_oversize)
+
+# PCR-004 residual (b): NULL output with output_len > 0 is rejected; NULL
+# output with output_len == 0 is pinned unchanged (owner direction 2026-10-12).
+add_executable(test_admission_null_output tests/test_admission_null_output.c)
+target_link_libraries(test_admission_null_output axioma_oracle)
+add_test(NAME test_admission_null_output COMMAND test_admission_null_output)
+
 # Historical record classifier boundary (SRS-004-AMD-001): stdlib Python only.
 find_program(PYTHON3_EXE python3 REQUIRED)
 add_test(NAME test_obs_v1_loss_check
@@ -276,6 +288,14 @@ if(ORACLE_BUILD_GATEWAY)
     target_include_directories(test_gw_wal PRIVATE gateway/include)
     add_test(NAME test_gw_wal COMMAND test_gw_wal)
 
+    # PCR-004 residual (c): model_id and oracle_id checked at config load
+    # with the admission identifier rules (owner direction 2026-10-12).
+    add_executable(test_gw_config
+        gateway/tests/test_gw_config.c gateway/src/gw_config.c)
+    target_include_directories(test_gw_config PRIVATE gateway/include)
+    target_link_libraries(test_gw_config PRIVATE axioma_oracle)
+    add_test(NAME test_gw_config COMMAND test_gw_config)
+
     add_executable(test_gw_fixture
         gateway/tests/test_gw_fixture.c gateway/src/gw_json.c)
     target_include_directories(test_gw_fixture PRIVATE gateway/include)
@@ -289,6 +309,26 @@ if(ORACLE_BUILD_GATEWAY)
              ${CMAKE_CURRENT_SOURCE_DIR}/gateway/tests/test_gw_signals.sh
              $<TARGET_FILE:axioma-gateway>)
     set_tests_properties(test_gw_signals PROPERTIES
+        TIMEOUT 120
+        SKIP_RETURN_CODE 77)
+
+    # PCR-004 residual (d): the reference client sends the required
+    # temperature_q16 line and its requests are served and committed.
+    add_test(NAME test_gw_client COMMAND sh
+             ${CMAKE_CURRENT_SOURCE_DIR}/gateway/tests/test_gw_client.sh
+             $<TARGET_FILE:axioma-gateway>
+             ${CMAKE_CURRENT_SOURCE_DIR}/gateway/gw-client.py)
+    set_tests_properties(test_gw_client PROPERTIES
+        TIMEOUT 60
+        SKIP_RETURN_CODE 77)
+
+    # PCR-004 residual (c): a configuration refused at load makes zero
+    # upstream calls and writes nothing (owner direction 2026-10-12,
+    # Round 7 item 7).
+    add_test(NAME test_gw_config_zero_upstream COMMAND sh
+             ${CMAKE_CURRENT_SOURCE_DIR}/gateway/tests/test_gw_config_zero_upstream.sh
+             $<TARGET_FILE:axioma-gateway>)
+    set_tests_properties(test_gw_config_zero_upstream PROPERTIES
         TIMEOUT 120
         SKIP_RETURN_CODE 77)
 endif()

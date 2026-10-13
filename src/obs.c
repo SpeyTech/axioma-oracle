@@ -131,10 +131,45 @@ static int input_is_schema_valid(const ax_obs_input_t *in)
     if (!state_pair_is_permitted(in->completion_state, in->failure_type)) {
         return 0;
     }
+    /* PCR-004 residual (a): an ERROR input whose output exceeds
+     * AX_MAX_OUTPUT_BYTES would be relabelled TRUNCATED by the SHALL-040
+     * truncation below while keeping its failure_type, giving a record
+     * pair outside the permitted list (TRUNCATED/TIMEOUT and so on).
+     * Reject it here, before truncation can relabel it. COMPLETE and
+     * TRUNCATED inputs are not affected: SHALL-040 truncation of those
+     * is unchanged. */
+    if ((int)in->completion_state == (int)AX_COMPLETION_ERROR &&
+        in->output_len > AX_MAX_OUTPUT_BYTES) {
+        return 0;
+    }
     if (in->input == NULL && in->input_len > 0) {
         return 0;
     }
+    /* PCR-004 residual (b): output NULL with output_len > 0 was admitted
+     * as an empty output with output_size 0 (over the limit, with state
+     * TRUNCATED and still output_size 0). It mirrors the input rule
+     * above. NULL output with output_len == 0 stays admissible. */
+    if (in->output == NULL && in->output_len > 0) {
+        return 0;
+    }
     return 1;
+}
+
+/*
+ * Identifier check exported for configuration-time use (PCR-004 residual
+ * c). It composes the two rules ax_obs_admit applies to model_id and
+ * oracle_id, in the same order: the length bound (AX_ERR_SIZE), then the
+ * content rule (AX_ERR_SCHEMA). It adds no rule of its own.
+ */
+int ax_obs_identifier_check(const char *id, size_t max_bytes)
+{
+    if (id_too_long(id, max_bytes)) {
+        return AX_ERR_SIZE;
+    }
+    if (!id_is_well_formed(id)) {
+        return AX_ERR_SCHEMA;
+    }
+    return AX_OK;
 }
 
 /**
