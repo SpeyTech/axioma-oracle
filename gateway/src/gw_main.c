@@ -322,6 +322,7 @@ static void handle_request(gw_state_t *st, int cfd, const char *api_key)
         intent.seed = -1;
         intent.temperature_q16 = params.temperature;
         intent.top_p_q16 = params.top_p;
+        intent.ledger_seq = gwl_seq() + 1u;   /* where this obs will land (B-02) */
         if (gw_wal_write(st->cfg->wal_path, &intent) != 0) {
             gw_log("error", "fault", "WAL intent write failed", -1, -1, 0);
             proto_error(cfd, "internal");
@@ -589,29 +590,93 @@ static void handle_request(gw_state_t *st, int cfd, const char *api_key)
 
 /* ---- WAL recovery -> failure observation ------------------------------- */
 
+/* The input of the Interrupted record for an intent: the prompt is gone
+ * by design (only its hash was durable), so the record hashes this line
+ * and states only what is known, that a call with this input_hash was
+ * accepted and no response was evidenced. */
+static int interrupted_input(char *dst, size_t cap, const gw_intent_t *in)
+{
+    int n = snprintf(dst, cap, "unclosed-intent input_hash=%s", in->input_hash_hex);
+    return (n > 0 && (size_t)n < cap) ? n : -1;
+}
+
+/* Is the last frame the observation for this intent? It must be an
+ * AX:OBS:v1 record at the intent's ledger_seq whose input_hash is the
+ * prompt's (the call completed) or the Interrupted input's (an earlier
+ * recovery wrote it and stopped before clearing the intent). */
+static int last_frame_is_intent_record(const gw_intent_t *in)
+{
+    const char *tag = NULL;
+    const uint8_t *pl = NULL;
+    size_t pn = 0;
+    uint64_t seq = 0;
+    char got[AX_HASH_HEX_SIZE + 8];
+    char synth[256];
+    uint8_t h[32];
+    char synth_hex[65];
+    int sn;
+
+    if (gwl_last_frame(&tag, &pl, &pn) != 0) return 0;
+    if (strcmp(tag, GW_TAG_OBS) != 0) return 0;
+    if (gwj_top_u64((const char *)pl, pn, "ledger_seq", &seq) != 0 ||
+        seq != in->ledger_seq) return 0;
+    if (gwj_top_string((const char *)pl, pn, "input_hash", got, sizeof got) != 0)
+        return 0;
+    if (strcmp(got, in->input_hash_hex) == 0) return 1;
+    sn = interrupted_input(synth, sizeof synth, in);
+    if (sn < 0) return 0;
+    ax_compute_input_hash(h, synth, (size_t)sn);
+    hex32(synth_hex, h);
+    return strcmp(got, synth_hex) == 0;
+}
+
+/* Start-up recovery of an open intent (CONTRACT.md section 3). Runs after
+ * replay and before anything else is appended. Returns 0 to continue
+ * start-up, -1 to refuse it with the ledger and the intent untouched. */
 static int recover_wal(gw_state_t *st)
 {
     gw_intent_t in;
+    char msg[256];
     int r = gw_wal_recover(st->cfg->wal_path, &in);
     if (r == 0) return 0;
     if (r < 0) {
         gw_log("error", "fault", "corrupt WAL intent; refusing to start", -1, -1, 0);
         return -1;
     }
-    /* If the most recent chain payload already carries this intent's
-     * input_hash, the observation landed before the crash and the
-     * intent is stale: close it without a second record. */
-    if (gwl_last_payload_contains(in.input_hash_hex)) {
-        gw_log("info", "wal_recovered",
-               "intent already evidenced; clearing stale WAL", -1, -1, gwl_seq());
-        return gw_wal_clear(st->cfg->wal_path);
+
+    if (in.ledger_seq != 0) {
+        uint64_t cur = gwl_seq();
+        if (cur == in.ledger_seq) {
+            if (!last_frame_is_intent_record(&in)) {
+                (void)snprintf(msg, sizeof msg,
+                    "frame %llu is not the record for the open intent; "
+                    "refusing to start", (unsigned long long)cur);
+                gw_log("error", "fault", msg, -1, -1, cur);
+                return -1;
+            }
+            gw_log("info", "wal_recovered",
+                   "intent already evidenced at its sequence; clearing", -1, -1, cur);
+            return gw_wal_clear(st->cfg->wal_path);
+        }
+        if (cur + 1u != in.ledger_seq) {
+            (void)snprintf(msg, sizeof msg,
+                "ledger ends at %llu but the open intent expects %llu; "
+                "refusing to start", (unsigned long long)cur,
+                (unsigned long long)in.ledger_seq);
+            gw_log("error", "fault", msg, -1, -1, cur);
+            return -1;
+        }
+        /* cur == ledger_seq - 1: the intent's record is absent */
+    } else {
+        /* Written by a binary before ledger_seq existed: whether its
+         * record landed cannot be decided by position, and deciding by
+         * prompt is B-02. Record it; a duplicate is honest, a loss is not. */
+        gw_log("warn", "wal_recovered",
+               "legacy intent without ledger_seq: recording as Interrupted "
+               "(may duplicate a recorded call)", -1, -1, gwl_seq());
     }
+
     {
-        /* The original prompt is gone by design (only its hash was
-         * durable), so the recovery obs hashes the recorded intent line
-         * itself as its input: the evidence honestly states what is
-         * known, which is that a call with this input_hash was made and
-         * no response was evidenced. */
         ax_oracle_params_t params;
         char synth[256];
         char obs_hash_hex[AX_HASH_HEX_SIZE];
@@ -624,9 +689,8 @@ static int recover_wal(gw_state_t *st)
         if (in.temperature_q16 != INT32_MIN) params.temperature = in.temperature_q16;
         if (in.top_p_q16 != INT32_MIN)       params.top_p = in.top_p_q16;
 
-        n = snprintf(synth, sizeof synth,
-                     "unclosed-intent input_hash=%s", in.input_hash_hex);
-        if (n <= 0) return -1;
+        n = interrupted_input(synth, sizeof synth, &in);
+        if (n < 0) return -1;
 
         if (commit_observation(st, AX_COMPLETION_ERROR,
                                AX_FAILURE_TRANSPORT_ERROR,

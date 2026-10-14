@@ -33,8 +33,12 @@ int main(void)
     CHECK(gwl_append("AX:STATE:v1", (const uint8_t *)"{\"b\":2}", 7,
                      head2, &seq) == 0 && seq == 2, "append 2");
     CHECK(memcmp(head1, head2, 32) != 0, "heads advance");
-    CHECK(gwl_last_payload_contains("\"b\":2") == 1 &&
-          gwl_last_payload_contains("zebra") == 0, "last payload probe");
+    {
+        const char *tg = NULL; const uint8_t *pl = NULL; size_t pn = 0;
+        CHECK(gwl_last_frame(&tg, &pl, &pn) == 0 &&
+              strcmp(tg, "AX:STATE:v1") == 0 && pn == 7 &&
+              memcmp(pl, "{\"b\":2}", 7) == 0, "last frame after append");
+    }
     gwl_close();
 
     /* replay: identical head, sequence 2 */
@@ -42,8 +46,12 @@ int main(void)
     gwl_head(head3);
     CHECK(memcmp(head2, head3, 32) == 0 && gwl_seq() == 2,
           "replay head bit-identical");
-    CHECK(gwl_last_payload_contains("\"b\":2") == 1,
-          "last payload restored by replay");
+    {
+        const char *tg = NULL; const uint8_t *pl = NULL; size_t pn = 0;
+        CHECK(gwl_last_frame(&tg, &pl, &pn) == 0 &&
+              strcmp(tg, "AX:STATE:v1") == 0 && pn == 7 &&
+              memcmp(pl, "{\"b\":2}", 7) == 0, "last frame restored by replay");
+    }
     gwl_close();
 
     /* unregistered tag refused */

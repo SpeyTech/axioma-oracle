@@ -27,6 +27,7 @@ static int   g_fd = -1;
 static int   g_export_fd = -1;   /* serving-determinism witness export */
 static char  g_last_payload[GWL_PAYLOAD_MAX];
 static size_t g_last_payload_len = 0;
+static char  g_last_tag[GWL_TAG_MAX + 1];
 
 static int read_exact(int fd, void *buf, size_t n, size_t *got)
 {
@@ -120,6 +121,7 @@ int gwl_open(const char *path, int torn_tail_ok, int *truncated)
 
         memcpy(g_last_payload, payload, (size_t)plen);
         g_last_payload_len = (size_t)plen;
+        memcpy(g_last_tag, tag, (size_t)tag_len + 1u);
         good_end = lseek(g_fd, 0, SEEK_CUR);
         if (good_end < 0) goto fail;
         continue;
@@ -190,6 +192,7 @@ int gwl_append(const char *tag, const uint8_t *payload, uint64_t payload_len,
     memcpy(g_last_payload, payload,
            (size_t)(payload_len < GWL_PAYLOAD_MAX ? payload_len : GWL_PAYLOAD_MAX));
     g_last_payload_len = (size_t)payload_len;
+    memcpy(g_last_tag, tag, tag_len + 1u);
 
     if (head_out != NULL) memcpy(head_out, g_ctx.current_hash, 32);
     if (seq_out  != NULL) *seq_out = g_ctx.sequence;
@@ -236,18 +239,12 @@ int gwl_export_active(void) { return g_export_fd >= 0; }
 
 void gwl_head(uint8_t out[32]) { memcpy(out, g_ctx.current_hash, 32); }
 
-int gwl_last_payload_contains(const char *needle)
+int gwl_last_frame(const char **tag, const uint8_t **payload, size_t *len)
 {
-    size_t nl;
-    if (needle == NULL || g_last_payload_len == 0) return 0;
-    nl = strlen(needle);
-    if (nl == 0 || nl > g_last_payload_len) return 0;
-    {
-        size_t i;
-        for (i = 0; i + nl <= g_last_payload_len; i++) {
-            if (memcmp(g_last_payload + i, needle, nl) == 0) return 1;
-        }
-    }
+    if (g_ctx.sequence == 0 || g_last_payload_len == 0) return -1;
+    if (tag != NULL)     *tag = g_last_tag;
+    if (payload != NULL) *payload = (const uint8_t *)g_last_payload;
+    if (len != NULL)     *len = g_last_payload_len;
     return 0;
 }
 

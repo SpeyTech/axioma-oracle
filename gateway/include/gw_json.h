@@ -10,6 +10,7 @@
 #define GW_JSON_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 /* Escape src into dst as JSON string content (no surrounding quotes).
  * Returns bytes written, or -1 if dst too small. Input must be valid
@@ -39,6 +40,13 @@ int gwj_content_text(const char *body, size_t body_len,
  * Returns 0 on success, -1 if absent or not a string. */
 int gwj_top_string(const char *body, size_t body_len, const char *key,
                    char *dst, size_t cap);
+
+/* Extract a top-level unsigned integer field (e.g. "ledger_seq"):
+ * plain decimal digits, no sign, fraction, exponent or leading zero,
+ * within uint64_t. Returns 0 on success, -1 if absent or not such a
+ * number. */
+int gwj_top_u64(const char *body, size_t body_len, const char *key,
+                uint64_t *out);
 
 /* Extract error.message from an error body. Returns 0 or -1. */
 int gwj_error_message(const char *body, size_t body_len,

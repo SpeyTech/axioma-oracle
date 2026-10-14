@@ -287,6 +287,47 @@ int gwj_top_string(const char *body, size_t body_len, const char *key,
     }
 }
 
+int gwj_top_u64(const char *body, size_t body_len, const char *key,
+                uint64_t *out)
+{
+    scan_t s = { body, body + body_len };
+    s_ws(&s);
+    if (s_eof(&s) || *s.p != '{') return -1;
+    s.p++;
+    for (;;) {
+        char kbuf[64]; size_t klen = 0;
+        s_ws(&s);
+        if (!s_eof(&s) && *s.p == '}') return -1;      /* not found */
+        if (s_decode_string(&s, kbuf, sizeof kbuf - 1, &klen) != 0) return -1;
+        kbuf[klen] = '\0';
+        s_ws(&s);
+        if (s_eof(&s) || *s.p != ':') return -1;
+        s.p++;
+        s_ws(&s);
+        if (strcmp(kbuf, key) == 0) {
+            uint64_t v = 0;
+            const char *d0 = s.p;
+            while (!s_eof(&s) && *s.p >= '0' && *s.p <= '9') {
+                unsigned int dg = (unsigned int)(*s.p - '0');
+                if (v > (UINT64_MAX - dg) / 10u) return -1;   /* overflow */
+                v = v * 10u + dg;
+                s.p++;
+            }
+            if (s.p == d0) return -1;                      /* not a number */
+            if (s.p - d0 > 1 && *d0 == '0') return -1;     /* leading zero */
+            s_ws(&s);
+            if (s_eof(&s) || (*s.p != ',' && *s.p != '}')) return -1;
+            *out = v;
+            return 0;
+        }
+        if (s_skip_value(&s, 0) != 0) return -1;
+        s_ws(&s);
+        if (s_eof(&s)) return -1;
+        if (*s.p == ',') { s.p++; continue; }
+        return -1;                                      /* '}' or junk */
+    }
+}
+
 /* Walk content[] and concatenate text of "type":"text" blocks. */
 int gwj_content_text(const char *body, size_t body_len,
                      char *dst, size_t cap, size_t *out_len)

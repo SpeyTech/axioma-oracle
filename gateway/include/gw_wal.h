@@ -9,6 +9,10 @@
  * TRANSPORT_ERROR observation. Serial service means at most one open
  * intent ever exists, so the WAL is a single file whose existence is
  * the open/closed bit.
+ *
+ * ledger_seq binds the intent to the chain position its observation
+ * will occupy (B-02): recovery decides "already recorded" by that
+ * position, never by the prompt, because a prompt can repeat.
  */
 #ifndef GW_WAL_H
 #define GW_WAL_H
@@ -22,6 +26,7 @@ typedef struct {
     int64_t  seed;
     int32_t  temperature_q16;   /* INT32_MIN = null */
     int32_t  top_p_q16;         /* INT32_MIN = null */
+    uint64_t ledger_seq;        /* expected seq of the obs; 0 = absent (legacy) */
 } gw_intent_t;
 
 /* Write the intent durably (write, fsync, fsync dir). Fails if an
@@ -32,7 +37,8 @@ int gw_wal_write(const char *path, const gw_intent_t *in);
 int gw_wal_clear(const char *path);
 
 /* If an intent file exists, load it into *out and return 1.
- * Return 0 if none, -1 on a corrupt intent (refuse to start). */
+ * Return 0 if none, -1 on a corrupt intent (refuse to start).
+ * An intent written before ledger_seq existed loads with ledger_seq 0. */
 int gw_wal_recover(const char *path, gw_intent_t *out);
 
 #endif /* GW_WAL_H */

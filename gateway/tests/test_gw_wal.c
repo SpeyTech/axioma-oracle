@@ -34,7 +34,12 @@ int main(void)
     a.seed = -1;
     a.temperature_q16 = 0;
     a.top_p_q16 = INT32_MIN;
+    a.ledger_seq = 0;
 
+    CHECK(gw_wal_write(WPATH, &a) != 0, "intent without ledger_seq refused");
+    CHECK(access(WPATH, F_OK) != 0, "refused intent leaves no file");
+
+    a.ledger_seq = 7;
     CHECK(gw_wal_write(WPATH, &a) == 0, "intent written");
     CHECK(gw_wal_write(WPATH, &a) != 0, "second open intent refused");
 
@@ -43,7 +48,8 @@ int main(void)
           strcmp(a.model_id, b.model_id) == 0 &&
           a.max_tokens == b.max_tokens &&
           a.temperature_q16 == b.temperature_q16 &&
-          a.top_p_q16 == b.top_p_q16, "fields round trip");
+          a.top_p_q16 == b.top_p_q16 &&
+          a.ledger_seq == b.ledger_seq, "fields round trip");
 
     CHECK(gw_wal_clear(WPATH) == 0, "intent cleared");
     CHECK(gw_wal_recover(WPATH, &b) == 0, "clear leaves no intent");
@@ -54,6 +60,39 @@ int main(void)
         if (f) { fputs("input_hash=abc\nmodel_id=m\n", f); fclose(f); }
         CHECK(gw_wal_recover(WPATH, &b) == -1, "corrupt intent fails closed");
         (void)unlink(WPATH);
+    }
+
+    /* legacy intent (written before ledger_seq existed) loads with 0 */
+    {
+        FILE *f = fopen(WPATH, "wb");
+        if (f) {
+            fputs("input_hash=0123456789abcdef0123456789abcdef"
+                  "0123456789abcdef0123456789abcdef\nmodel_id=m\n", f);
+            fclose(f);
+        }
+        CHECK(gw_wal_recover(WPATH, &b) == 1 && b.ledger_seq == 0,
+              "legacy intent loads with ledger_seq 0");
+        (void)unlink(WPATH);
+    }
+
+    /* malformed ledger_seq fails closed */
+    {
+        static const char *bad[] = { "0", "-1", "12x", "x", " 5",
+                                     "99999999999999999999999" };
+        size_t i;
+        int all = 1;
+        for (i = 0; i < sizeof bad / sizeof bad[0]; i++) {
+            FILE *f = fopen(WPATH, "wb");
+            if (f) {
+                fprintf(f, "input_hash=0123456789abcdef0123456789abcdef"
+                           "0123456789abcdef0123456789abcdef\nmodel_id=m\n"
+                           "ledger_seq=%s\n", bad[i]);
+                fclose(f);
+            }
+            if (gw_wal_recover(WPATH, &b) != -1) all = 0;
+            (void)unlink(WPATH);
+        }
+        CHECK(all, "malformed ledger_seq fails closed");
     }
 
     printf("%s\n", failures == 0 ? "ALL PASS" : "FAILURES");

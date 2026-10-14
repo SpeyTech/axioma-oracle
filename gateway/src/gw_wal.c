@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <libgen.h>
+#include <errno.h>
 
 static int fsync_parent_dir(const char *path)
 {
@@ -34,15 +35,17 @@ int gw_wal_write(const char *path, const gw_intent_t *in)
     char buf[768];
     int n;
 
+    if (in->ledger_seq == 0) return -1;   /* every new intent is bound to a seq */
     fd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0640);
     if (fd < 0) return -1;   /* exists: sequencing bug, refuse */
 
     n = snprintf(buf, sizeof buf,
         "input_hash=%s\nmodel_id=%s\nmax_tokens=%ld\nseed=%lld\n"
-        "temperature_q16=%ld\ntop_p_q16=%ld\n",
+        "temperature_q16=%ld\ntop_p_q16=%ld\nledger_seq=%llu\n",
         in->input_hash_hex, in->model_id,
         (long)in->max_tokens, (long long)in->seed,
-        (long)in->temperature_q16, (long)in->top_p_q16);
+        (long)in->temperature_q16, (long)in->top_p_q16,
+        (unsigned long long)in->ledger_seq);
     if (n < 0 || (size_t)n >= sizeof buf) { close(fd); return -1; }
 
     {
@@ -87,6 +90,7 @@ int gw_wal_recover(const char *path, gw_intent_t *out)
     out->top_p_q16 = INT32_MIN;
     out->seed = -1;
     out->max_tokens = -1;
+    out->ledger_seq = 0;
 
     while (fgets(line, sizeof line, f) != NULL) {
         size_t l = strlen(line);
@@ -103,6 +107,18 @@ int gw_wal_recover(const char *path, gw_intent_t *out)
             { out->temperature_q16 = (int32_t)strtol(num, NULL, 10); continue; }
         if (parse_field(line, "top_p_q16", num, sizeof num) == 0)
             { out->top_p_q16 = (int32_t)strtol(num, NULL, 10); continue; }
+        if (parse_field(line, "ledger_seq", num, sizeof num) == 0) {
+            /* digits only, 1..UINT64_MAX; anything else is corrupt */
+            char *end = NULL;
+            unsigned long long v;
+            if (num[0] < '0' || num[0] > '9') { fclose(f); return -1; }
+            errno = 0;
+            v = strtoull(num, &end, 10);
+            if (errno != 0 || end == NULL || *end != '\0' || v == 0)
+                { fclose(f); return -1; }
+            out->ledger_seq = (uint64_t)v;
+            continue;
+        }
     }
     fclose(f);
 

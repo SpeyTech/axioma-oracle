@@ -60,10 +60,11 @@ void     gwl_head(uint8_t out[32]);
 int gwl_export_enable(const char *path);
 int gwl_export_active(void);
 
-/* Does the most recent frame's payload contain the given substring?
- * Used by WAL recovery to detect an intent whose observation did land
- * before the crash (payload carries the input_hash hex). */
-int gwl_last_payload_contains(const char *needle);
+/* The last frame on the chain (after replay or the latest append): its
+ * tag and payload, valid until the next append. Returns -1 when the
+ * chain holds no frame. Used by intent recovery to test the frame at
+ * the intent's expected sequence. */
+int gwl_last_frame(const char **tag, const uint8_t **payload, size_t *len);
 
 void gwl_close(void);
 

@@ -6,6 +6,7 @@
 #include "gw_json.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 
 static int failures = 0;
 #define CHECK(cond, name) do { \
@@ -159,6 +160,27 @@ int main(void)
         CHECK(all, "escape_utf8: malformed UTF-8 rejected");
         CHECK(gwj_escape_utf8(e, sizeof e, "\xed\x9f\xbf\xf4\x8f\xbf\xbf", 7) == 7,
               "escape_utf8: U+D7FF and U+10FFFF accepted");
+    }
+
+    /* gwj_top_u64: the obs record's ledger_seq, for intent recovery */
+    {
+        uint64_t v = 0;
+        const char *rec = "{\"completion_state\":\"COMPLETE\",\"failure_type\":null,"
+                          "\"input_hash\":\"ab\",\"ledger_seq\":42,"
+                          "\"output\":\"\\\"ledger_seq\\\":7\","
+                          "\"params\":{\"ledger_seq\":9}}";
+        CHECK(gwj_top_u64(rec, strlen(rec), "ledger_seq", &v) == 0 && v == 42,
+              "top_u64: top-level value, not nested or quoted");
+        CHECK(gwj_top_u64("{\"a\":18446744073709551615}", 27, "a", &v) == 0 &&
+              v == UINT64_MAX, "top_u64: UINT64_MAX");
+        CHECK(gwj_top_u64("{\"a\":18446744073709551616}", 27, "a", &v) == -1,
+              "top_u64: overflow refused");
+        CHECK(gwj_top_u64("{\"a\":-1}", 9, "a", &v) == -1 &&
+              gwj_top_u64("{\"a\":01}", 9, "a", &v) == -1 &&
+              gwj_top_u64("{\"a\":1.5}", 10, "a", &v) == -1 &&
+              gwj_top_u64("{\"a\":\"1\"}", 10, "a", &v) == -1 &&
+              gwj_top_u64("{\"b\":1}", 8, "a", &v) == -1,
+              "top_u64: sign, leading zero, fraction, string, absent refused");
     }
 
     printf("%s\n", failures == 0 ? "ALL PASS" : "FAILURES");
