@@ -1,10 +1,14 @@
 # axioma-gateway
 
-The L3 service layer. Wraps the axioma-oracle library around the
-Anthropic Messages API so that every oracle invocation, successful or
-not, becomes a validated AX:OBS:v1 record appended to a durable L6
+The L3 service layer. Wraps the axioma-oracle library around one
+upstream messages API so that every accepted request, successful or
+not, yields exactly one validated AX:OBS:v1 record on a durable L6
 evidence chain. The oracle is recorded, not trusted; the wrapper is
 trusted, and it is deterministic C.
+
+What the gateway promises, and what it does not, is stated in
+`CONTRACT.md` at the repository root. Where this README and the contract
+differ, the contract applies.
 
 The library is not modified. The gateway is net-new code under
 `gateway/`, built by the `ORACLE_BUILD_GATEWAY` option in the
@@ -38,10 +42,12 @@ Request: header lines, a blank line, then the prompt bytes.
 
     What is a monad, aye?
 
-`temperature_q16` and `top_p_q16` are Q16.16 integers (65536 = 1.0);
-omitted params are recorded as null and not sent. `seed` is rejected:
-the Messages API carries no seed parameter, and recording a parameter
-that was not sent would be false evidence.
+`temperature_q16` and `top_p_q16` are Q16.16 integers (65536 = 1.0).
+`temperature_q16` is required: a request without it is refused with
+`reason: temperature_required`. An omitted `top_p_q16` is recorded as
+null and not sent. `seed` is rejected: the upstream API carries no seed
+parameter, and recording a parameter that was not sent would be false
+evidence.
 
 Response: header lines, a blank line, then the output bytes.
 
@@ -57,9 +63,13 @@ Response: header lines, a blank line, then the output bytes.
 
 Failures return `status: error` with the failure taxonomy in
 `failure_type` (TIMEOUT, INVALID_OUTPUT, TRANSPORT_ERROR); the
-observation is on the chain either way. Pre-spend rejections
+observation is on the chain either way. TIMEOUT and TRANSPORT_ERROR
+mean no valid response reached the gateway, not that the upstream did
+nothing (CONTRACT.md R-2). Output containing a control character other
+than LF (for example a TAB), or text that is not NFC, is recorded as
+INVALID_OUTPUT with empty output (R-5). Pre-spend rejections
 (encoding, budget, protocol) return `status: error` with a `reason`
-line and produce no observation.
+line, produce no observation and send nothing upstream.
 
 Upstream request body: the gateway sends the oracle API one JSON object
 with the members `model`, `max_tokens`, optional `temperature` and
@@ -106,14 +116,30 @@ trimming values, or decoding with replacement can change
 
 - `ledger_path` is the append-only evidence file: framed records
   (tag, payload, commit). Startup replays it from genesis through
-  axioma-audit, recomputing every commit and link; divergence refuses
-  service. The file persists across restarts and is never truncated
-  except for a torn tail under an open WAL intent.
+  axioma-audit, recomputing every commit and the chain head; a frame
+  that does not match its commit refuses service. Chain links are not
+  stored in the file, so replay alone detects altered frames but not a
+  removed tail or a consistently rewritten history: those need a
+  `(seq, chain_head)` pair held elsewhere, such as one kept from a
+  reply (CONTRACT.md section 5). The file persists across restarts and
+  is never truncated except for a torn tail under an open WAL intent.
 - `wal_path` is the durable intent: written and fsynced before any
-  network I/O, cleared after the observation is on the chain. An
-  unclosed intent found at startup is replayed into a TRANSPORT_ERROR
-  observation.
-- The config file's SHA-256 is committed as AX:STATE:v1 at every start.
+  network I/O, cleared after the observation is on the chain. It
+  records `ledger_seq`, the sequence its observation will occupy. At
+  start, an unclosed intent whose record is already at that sequence is
+  cleared; one whose record is absent is recorded as a TRANSPORT_ERROR
+  observation (the Interrupted record); any other ledger state refuses
+  start. An intent from an earlier binary, without `ledger_seq`, is
+  always recorded (CONTRACT.md section 3). Before this rule, a repeated
+  prompt interrupted in flight could be lost (B-02).
+- After an internal fault that leaves an intent open, the gateway exits
+  non-zero so the unit restarts it and start-up records the call.
+- `max_attempts` defaults to 1, the supported configuration: at most
+  one upstream transmission per record (CONTRACT.md R-4).
+- AX:STATE:v1 is committed at every start with the config file's
+  SHA-256 and `source_commit`, the axioma-oracle commit the binary was
+  built from, or `unknown` when that cannot be established (CONTRACT.md
+  section 6).
 
 ## Log
 
