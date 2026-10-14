@@ -234,13 +234,6 @@ if(ENABLE_UBSAN)
 endif()
 
 # ==============================================================================
-# Install Configuration
-# ==============================================================================
-
-# Installation is the gateway, its tools and their documentation only
-# (INSTALL.md). The libraries are internal to this build.
-
-# ==============================================================================
 # Summary
 # ==============================================================================
 
@@ -453,3 +446,23 @@ endif()
 # shellcheck is not installed rather than passing vacuously.
 add_test(NAME test_shellcheck COMMAND sh
          ${CMAKE_CURRENT_SOURCE_DIR}/tools/shellcheck_suite.sh)
+
+# ==============================================================================
+# Install Configuration
+# ==============================================================================
+
+# Installation is the gateway, its tools and their documentation only
+# (INSTALL.md). The libraries are internal to this build. Stage with
+# `cmake --install build --prefix <dir>`; never install over a running
+# service outside the owner-run upgrade (UPGRADE.md).
+if(ORACLE_BUILD_GATEWAY)
+    install(TARGETS axioma-gateway RUNTIME DESTINATION bin)
+endif()
+install(PROGRAMS tools/axioma-verify-ledger tools/axioma-client
+        DESTINATION bin)
+install(PROGRAMS tools/axioma-standin tools/demo.sh tools/dry-run-upgrade.sh
+                 tools/obs_v1_loss_check.py
+        DESTINATION share/axioma/tools)
+install(FILES gateway/axioma-gateway.service gateway/gateway.conf.example
+              CONTRACT.md INSTALL.md OPERATOR.md UPGRADE.md
+        DESTINATION share/axioma)

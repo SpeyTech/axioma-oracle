@@ -17,7 +17,7 @@ if ! command -v shellcheck >/dev/null 2>&1; then
 fi
 
 found=0
-for f in tools/*.sh gateway/tests/*.sh; do
+for f in verify.sh tools/*.sh gateway/tests/*.sh; do
     [ -e "${f}" ] || continue
     found=1
     shellcheck -x "${f}"

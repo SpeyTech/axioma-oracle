@@ -1,0 +1,39 @@
+# axioma-oracle CI. The repository is self-contained: no sibling checkouts,
+# no secrets, no network beyond the runner's package mirror. Third-party
+# actions are pinned by full commit SHA; the checkout keeps no credentials.
+name: ci
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: gcc-release,   os: ubuntu-24.04,     cc: gcc,   san: "0" }
+          - { name: clang-release, os: ubuntu-24.04,     cc: clang, san: "0" }
+          - { name: asan-ubsan,    os: ubuntu-24.04,     cc: gcc,   san: "1" }
+          - { name: arm64-gcc,     os: ubuntu-24.04-arm, cc: gcc,   san: "0" }
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake clang shellcheck libcurl4-openssl-dev libssl-dev
+          ${{ matrix.cc }} --version | head -1; uname -m; openssl version
+      - name: verify.sh (build, every test, fingerprints, reproducibility)
+        env:
+          CC: ${{ matrix.cc }}
+          VERIFY_SANITIZE: ${{ matrix.san }}
+        run: ./verify.sh "$RUNNER_TEMP/build"
+      - name: Demonstration (stand-in upstream, temporary directory)
+        run: sh tools/demo.sh "$RUNNER_TEMP/build/axioma-gateway"
+      - name: Historical-record loss checker smoke test
+        run: python3 -I tools/obs_v1_loss_check.py --jsonl /dev/null

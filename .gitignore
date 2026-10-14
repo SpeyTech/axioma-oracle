@@ -1,3 +1,6 @@
 build/
 Testing/
 oracle-alignment.tar.gz
+build-verify*/
+build-verify*.log
+tools/__pycache__/
