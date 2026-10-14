@@ -132,10 +132,21 @@ unaltered, by recomputing to that position. Records after `seq` remain
 unanchored. The export file is **not** a checkpoint: it is rewritten from the
 primary ledger, on the same host, at every start.
 
-**Verification.** `axioma-audit/tools/verify_chain.py` recomputes a ledger
-against a supplied head. It is independently executable, being standard
-library only and sharing no code with the writer. It is not independently
-developed.
+**Verification.** `axioma-verify-ledger` (in `tools/`) recomputes a ledger
+offline, from a copy, with or without a held `seq:chain_head` pair. Its
+verdicts and exit statuses:
+
+| Verdict | Meaning | Exit |
+|---|---|---|
+| `REJECTED` | Not a ledger: a bad tag or payload length, or an unregistered tag | 2 |
+| `INCONSISTENT` | A frame does not match its commit, or the file ends inside a frame | 2 |
+| `CONSISTENT_UNANCHORED` | Every frame matches and chains; nothing anchors it | 4 |
+| `MATCHES_CHECKPOINT` | Frames 1 to `seq` reproduce the held head | 0 |
+| `CHECKPOINT_MISMATCH` | The ledger is shorter than `seq`, or frame `seq` does not reproduce the held head | 2 |
+
+Usage and I/O errors exit 1. The verifier is Python standard library only
+and shares no code with the writer, so it is independently executable. It is
+not independently developed.
 
 ## 6. Source identification (`source_commit`)
 
@@ -143,11 +154,13 @@ developed.
 axioma-oracle checkout has no modified tracked files at build time. Otherwise,
 including outside a git checkout, it records `unknown`.
 
-**What it identifies.** The axioma-oracle source tree.
+**What it identifies.** The axioma-oracle source tree, which since the
+consolidation includes the ledger and commitment code (`ledger/`,
+`substrate/`).
 
 **What it does not identify:**
 - untracked files;
-- the axioma-audit and axioma-spec trees compiled into the binary;
+- the platform libraries linked in (libcrypto, libcurl, libc);
 - the compiler and flags.
 
 It is the builder's statement, not an attestation, and it lets a reader tell
@@ -159,11 +172,13 @@ which ledger segments were written by which build.
 - outputs are stored in clear;
 - `input_hash` is an unsalted SHA-256, so it reveals any prompt that can be
   guessed;
-- the export is created world-readable.
+- the export is created world-readable (0644), by design, for a separate
+  reader.
 
-Protect `ledger_path`, `wal_path`, `export_path` and the log with directory
-permissions: for example, a directory owned by the service user with mode
-0750.
+The ledger is created 0640 and the log 0640; an existing file keeps its
+mode. Protect `ledger_path`, `wal_path`, `export_path` and the log with
+directory permissions as well: for example, a directory owned by the service
+user with mode 0750.
 
 **Threat model:**
 - **Clients** sending hostile input get a refusal.

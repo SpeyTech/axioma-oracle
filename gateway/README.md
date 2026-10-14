@@ -14,16 +14,14 @@ The library is not modified. The gateway is net-new code under
 `gateway/`, built by the `ORACLE_BUILD_GATEWAY` option in the
 repository CMakeLists.
 
-## Build (on axioma)
+## Build
 
-    cd ~/axilog/axioma-oracle
-    cmake -B build -DAXILOG_SDK_ROOT=$HOME/axilog/sdk-root \
-          -DAXIOMA_AUDIT_ROOT=$HOME/axilog/axioma-audit
-    cmake --build build
-    ctest --test-dir build
+    ./verify.sh            # from the repository root; see INSTALL.md
 
-Requires libcurl development headers (`apt install libcurl4-openssl-dev`)
-and an axioma-audit checkout (default: sibling directory).
+The repository is self-contained: the ledger and commitment code are in
+`ledger/` and `substrate/`, and SHA-256 is the platform libcrypto.
+Requires the libcurl and OpenSSL development headers
+(`apt install libcurl4-openssl-dev libssl-dev`).
 
 ## Run
 
@@ -116,12 +114,13 @@ trimming values, or decoding with replacement can change
 
 - `ledger_path` is the append-only evidence file: framed records
   (tag, payload, commit). Startup replays it from genesis through
-  axioma-audit, recomputing every commit and the chain head; a frame
+  the in-tree ledger code (`ledger/`), recomputing every commit and the chain head; a frame
   that does not match its commit refuses service. Chain links are not
   stored in the file, so replay alone detects altered frames but not a
   removed tail or a consistently rewritten history: those need a
   `(seq, chain_head)` pair held elsewhere, such as one kept from a
-  reply (CONTRACT.md section 5). The file persists across restarts and
+  reply (CONTRACT.md section 5). `axioma-verify-ledger` checks a copy
+  offline, with or without such a pair. The file persists across restarts and
   is never truncated except for a torn tail under an open WAL intent.
 - `wal_path` is the durable intent: written and fsynced before any
   network I/O, cleared after the observation is on the chain. It
@@ -143,7 +142,7 @@ trimming values, or decoding with replacement can change
 
 ## Log
 
-JSON lines at `log_path`. The `message` field is upstream-verbatim
+JSON lines at `log_path`, created 0640 (an existing file keeps its mode). The `message` field is upstream-verbatim
 (curl error strings, provider error messages); the API key is
 scrubbed at the formatting layer. This log is the harvest source for
 the EXP-1 error-string corpus.

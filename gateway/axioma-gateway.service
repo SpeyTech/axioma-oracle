@@ -37,7 +37,9 @@ RestartSec=2
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/axioma-gateway
+# The export directory is optional ("-" prefix: absent is not an error);
+# it must be listed for export_path to be writable under ProtectSystem.
+ReadWritePaths=/var/lib/axioma-gateway -/var/lib/axioma-gateway-export
 PrivateTmp=true
 ProtectKernelTunables=true
 ProtectKernelModules=true

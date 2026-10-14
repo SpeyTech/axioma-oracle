@@ -1,6 +1,6 @@
 # axioma-oracle
 
-**Axioma L3 — Oracle Boundary Gateway Layer**
+**Axioma L3, Oracle Boundary Gateway Layer**
 
 A cryptographic containment boundary for non-deterministic systems.
 
@@ -13,33 +13,49 @@ A cryptographic containment boundary for non-deterministic systems.
 > Inference outputs are not trusted. They are recorded.
 > Inference is not execution. Inference is evidence.
 
+## This repository
+
+One self-contained repository, built and tested by one script:
+
+| Part | Where | What it is |
+|---|---|---|
+| Oracle library | `src/`, `include/` | AX:OBS:v1 admission, canonicalisation and hashing (SRS-004) |
+| Ledger | `ledger/`, `substrate/` | Append-only, hash-chained evidence frames; SHA-256 and the commitment |
+| Gateway | `gateway/` | `axioma-gateway`: a serial AF_UNIX service that records every accepted upstream call |
+| Tools | `tools/` | `axioma-verify-ledger` (offline verifier), `axioma-client`, `axioma-standin` (local upstream for tests and the demo), `demo.sh`, `dry-run-upgrade.sh` |
+
+Documents: [CONTRACT.md](CONTRACT.md) (what the gateway promises, and what
+it does not), [INSTALL.md](INSTALL.md), [OPERATOR.md](OPERATOR.md) and
+[UPGRADE.md](UPGRADE.md).
+
 ## Features
 
-- **AX:OBS:v1 Record Construction** — Canonical oracle observation format
-- **RFC 8785 (JCS) Canonicalisation** — Deterministic JSON serialisation
-- **SHA-256 Hash Computation** — Pure C99 implementation
-- **UTF-8 + NFC Validation** — Encoding canonicality enforcement
-- **Line Ending Normalisation** — CRLF/CR → LF conversion
-- **Ledger Sequence Ordering** — Monotonic admission guard
-- **Replay Identity** — Bit-identical downstream behaviour
+- **AX:OBS:v1 Record Construction**: canonical oracle observation format
+- **RFC 8785 (JCS) Canonicalisation**: deterministic JSON serialisation
+- **SHA-256**: the platform libcrypto (OpenSSL 3, EVP), behind
+  `axilog_sha256()` and `axilog_commit()` in `substrate/`
+- **UTF-8 + NFC Validation**: encoding canonicality enforcement
+- **Line Ending Normalisation**: CRLF/CR to LF conversion
+- **Ledger Sequence Ordering**: monotonic admission guard
+- **Replay Identity**: bit-identical downstream behaviour
 
 ## Architecture
 
 ```
 Oracle Output
-     ↓
-┌─────────────────────────────────┐
-│  ax_obs_admit()                 │
-│  ├── Ordering guard (SHALL-038) │
-│  ├── Size bound (SHALL-048)     │
-│  ├── Encoding validation        │
-│  ├── Line normalisation         │
-│  ├── Input hash (SHA-256)       │
-│  └── obs_hash computation       │
-└─────────────────────────────────┘
-     ↓
+     |
++---------------------------------+
+|  ax_obs_admit()                 |
+|  +-- Ordering guard (SHALL-038) |
+|  +-- Size bound (SHALL-048)     |
+|  +-- Encoding validation        |
+|  +-- Line normalisation         |
+|  +-- Input hash (SHA-256)       |
+|  +-- obs_hash computation       |
++---------------------------------+
+     |
 AX:OBS:v1 Record
-     ↓
+     |
 L4 Policy Evaluation
 ```
 
@@ -47,48 +63,29 @@ L4 Policy Evaluation
 
 ### Requirements
 
-- GCC 9+ or Clang 10+
-- CMake 3.16+
-- C99 standard library
+- GCC or Clang (C99), CMake 3.16+
+- OpenSSL 3 development files (`libssl-dev`) and libcurl (`libcurl4-openssl-dev`)
+- Python 3 (tests and tools), shellcheck (one test)
 
-### Build
+### Build and test
 
-```bash
-mkdir build && cd build
-cmake ..
-make
+```sh
+./verify.sh                 # build, every test, reproducibility check
+VERIFY_SANITIZE=1 ./verify.sh   # adds an ASan + UBSan pass
 ```
 
-### Run Tests
+`verify.sh` builds in `./build-verify`. A plain CMake build also works:
 
-```bash
-cd build
-ctest --output-on-failure
-```
-
-Or run all tests verbosely:
-
-```bash
-ctest -V
-```
-
-### Build with Sanitizers
-
-```bash
-# UndefinedBehaviorSanitizer
-cmake .. -DENABLE_UBSAN=ON
-make
-
-# AddressSanitizer  
-cmake .. -DENABLE_ASAN=ON
-make
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+ctest --test-dir build --output-on-failure
 ```
 
 ### Install
 
-```bash
-cmake --install . --prefix /usr/local
-```
+See [INSTALL.md](INSTALL.md). Stage with `cmake --install build --prefix <dir>`;
+an existing installation is upgraded only by [UPGRADE.md](UPGRADE.md).
 
 ## Usage
 
@@ -163,40 +160,37 @@ if (result == AX_OK) {
 
 | Function | Description |
 |----------|-------------|
-| `ax_sha256()` | One-shot SHA-256 |
-| `ax_sha256_init/update/final()` | Incremental SHA-256 |
+| `ax_compute_input_hash()` | SHA-256 of the admitted input |
+| `ax_obs_compute_hash()` | obs_hash over the canonical record |
+| `axilog_sha256()`, `axilog_commit()` | SHA-256 and the tagged commitment (`substrate/`) |
 
 ## Test Suite
 
-| Suite | Tests | Description |
-|-------|-------|-------------|
-| test_obs_canonical | 14 | JCS canonicalisation |
-| test_obs_hash | 10 | SHA-256 and obs_hash |
-| test_encoding | 21 | UTF-8 and control chars |
-| test_ordering | 8 | Ledger sequence guard |
-| test_truncation | 7 | Size bounds |
-| test_replay_identity | 8 | Replay determinism |
-
-**Total: 68 tests**
+`ctest` runs the library suites (canonicalisation, hashing, encoding,
+ordering, truncation, replay identity), the ledger and commitment tests, the
+gateway unit and process tests (recovery, signals, client protocol, verifier,
+file modes), the cross-architecture fingerprints and shellcheck: 53 entries.
 
 ## Conformance
 
 See [CONFORMANCE.md](CONFORMANCE.md) for:
 - Full requirement traceability matrix
 - Test coverage report
-- Certification statement
+- The project's own conformance statement (not a third-party certification)
 
 **Status: SRS-004 v0.3 CONFORMANT (48/48 SHALL)**
 
 ## Constraints
 
-This implementation enforces:
+The oracle library (`src/`) enforces the following. The gateway is an
+ordinary service: it allocates, reads the clock for log lines and uses the
+network.
 
-- **Zero dynamic allocation** — All memory caller-provided
-- **No floating point** — Integer and fixed-point only
-- **No undefined behaviour** — C99 strict, UBSan clean
-- **No time access** — Time via admitted Time Oracle only
-- **Bit-identical results** — Cross-platform determinism
+- **Zero dynamic allocation**: All memory caller-provided
+- **No floating point**: Integer and fixed-point only
+- **No undefined behaviour**: C99 strict, UBSan clean
+- **No time access**: Time via admitted Time Oracle only
+- **Bit-identical results**: Cross-platform determinism
 
 ## License
 
@@ -206,12 +200,12 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 ## Related Documents
 
-- SRS-004 v0.3 — Oracle Boundary Gateway Contract
-- SRS-001 v0.3 — Axilog Substrate (L6)
-- SRS-002 v0.3 — Agent Totality (L5)
-- SRS-003 v0.3 — Policy Evaluation (L4)
-- DVEC-001 v1.3 — Deterministic Verification Contract
+- SRS-004 v0.3: Oracle Boundary Gateway Contract
+- SRS-001 v0.3: Axilog Substrate (L6)
+- SRS-002 v0.3: Agent Totality (L5)
+- SRS-003 v0.3: Policy Evaluation (L4)
+- DVEC-001 v1.3: Deterministic Verification Contract
 
 ---
 
-*axioma-oracle — A cryptographic containment boundary for non-determinism*
+*axioma-oracle: A cryptographic containment boundary for non-determinism*
