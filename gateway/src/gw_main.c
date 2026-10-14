@@ -25,6 +25,7 @@
 #include "gw_client.h"
 #include "gw_json.h"
 #include "gw_notify.h"
+#include "gw_source.h"   /* GW_SOURCE_COMMIT, generated at build time */
 
 #include <axilog/oracle.h>
 #include <axilog/obs.h>
@@ -827,20 +828,31 @@ int main(int argc, char **argv)
     }
     if (recover_wal(&st) != 0) return 1;
 
-    /* Config binding as chain evidence: AX:STATE:v1 per start. */
+    /* Config and source binding as chain evidence: AX:STATE:v1 per start.
+     * source_commit is the axioma-oracle commit the build recorded, or
+     * "unknown" (CONTRACT.md section 6); anything else in the generated
+     * header is reported as "unknown" rather than trusted. */
     {
         uint8_t cfg_hash[32];
         char cfg_hex[65];
-        char payload[192];
+        char payload[256];
+        const char *src = GW_SOURCE_COMMIT;
+        size_t si, sl = strlen(src);
         int n;
         uint8_t head[32];
         uint64_t seq;
+        int src_ok = (sl == 40u);
+        for (si = 0; src_ok && si < sl; si++)
+            src_ok = (src[si] >= '0' && src[si] <= '9') ||
+                     (src[si] >= 'a' && src[si] <= 'f');
+        if (!src_ok) src = "unknown";
         axilog_sha256(cfg_hash, cfg.raw, cfg.raw_len);
         hex32(cfg_hex, cfg_hash);
         n = snprintf(payload, sizeof payload,
             "{\"component\":\"axioma-gateway\",\"config_sha256\":\"%s\","
-            "\"evidence_type\":\"AX:STATE:v1\"}", cfg_hex);
-        if (n <= 0 ||
+            "\"evidence_type\":\"AX:STATE:v1\",\"source_commit\":\"%s\"}",
+            cfg_hex, src);
+        if (n <= 0 || (size_t)n >= sizeof payload ||
             gwl_append(GW_TAG_STATE, (const uint8_t *)payload,
                        (uint64_t)n, head, &seq) != 0) {
             gw_log("error", "fault", "config commitment failed", -1, -1, 0);

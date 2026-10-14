@@ -269,6 +269,20 @@ if(ORACLE_BUILD_GATEWAY)
     target_link_libraries(axioma-gateway PRIVATE
         axioma_oracle gw-ledger CURL::libcurl)
 
+    # Source identification for AX:STATE:v1 (CONTRACT.md section 6):
+    # regenerated at every build; the header changes only when the value does.
+    set(GW_GEN_DIR ${CMAKE_CURRENT_BINARY_DIR}/gateway-gen)
+    file(MAKE_DIRECTORY ${GW_GEN_DIR})
+    add_custom_target(gw_source_id
+        COMMAND ${CMAKE_COMMAND} -DSRC=${CMAKE_CURRENT_SOURCE_DIR}
+                -DOUT=${GW_GEN_DIR}/gw_source.h
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/gateway/cmake/gw_source.cmake
+        BYPRODUCTS ${GW_GEN_DIR}/gw_source.h
+        COMMENT "Recording the axioma-oracle source commit"
+        VERBATIM)
+    add_dependencies(axioma-gateway gw_source_id)
+    target_include_directories(axioma-gateway PRIVATE ${GW_GEN_DIR})
+
     add_executable(test_gw_json
         gateway/tests/test_gw_json.c gateway/src/gw_json.c)
     target_include_directories(test_gw_json PRIVATE gateway/include)
