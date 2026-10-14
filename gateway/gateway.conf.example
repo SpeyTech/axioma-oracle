@@ -23,7 +23,12 @@ model_id=claude-haiku-4-5-20251001
 # Client contract (defaults shown)
 #connect_timeout_s=10
 #response_timeout_s=300
-#max_attempts=3
+#max_attempts=1
+# 1 is the supported configuration: one accepted request, at most one
+# upstream transmission, one record (CONTRACT.md R-4). Values up to 10
+# retry after 429/5xx; each retry is a further transmission that the
+# record does not show (only the log does), so they are outside the
+# contract.
 #max_response_bytes=4194304
 
 # Spend guard: refusals past this per-run count are pre-spend and

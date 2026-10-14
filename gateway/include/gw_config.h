@@ -31,7 +31,7 @@ typedef struct {
 
     long connect_timeout_s;             /* default 10 */
     long response_timeout_s;            /* default 300 */
-    long max_attempts;                  /* default 3; 429/5xx retries */
+    long max_attempts;                  /* default 1 (supported); >1 retries 429/5xx */
     long max_response_bytes;            /* default 4 MiB */
     long call_budget;                   /* default 25; per-run spend guard */
     long default_max_tokens;            /* default 1024 */

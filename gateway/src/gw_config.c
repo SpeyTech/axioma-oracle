@@ -100,7 +100,7 @@ int gw_config_load(gw_config_t *cfg, const char *path)
                   "anthropic-messages-api");
     cfg->connect_timeout_s  = 10;
     cfg->response_timeout_s = 300;
-    cfg->max_attempts       = 3;
+    cfg->max_attempts       = 1;   /* supported configuration (CONTRACT.md R-4) */
     cfg->max_response_bytes = 4L * 1024L * 1024L;
     cfg->call_budget        = 25;
     cfg->default_max_tokens = 1024;
