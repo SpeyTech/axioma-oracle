@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Spey Systems Ltd (SC889983)
+#
+# axioma-standin - DEMONSTRATION AND TEST UPSTREAM ONLY. Not an inference
+# service. A loopback HTTP endpoint shaped like the upstream messages API,
+# so the gateway can be exercised with no network egress and no spend.
+# Standard library only.
+#
+# Behaviour is chosen by the first word of the prompt:
+#   ok...     200, COMPLETE, text "echo: <prompt>"
+#   trunc...  200, TRUNCATED (stop reason is the token limit)
+#   fail...   500 error body
+#   r429...   429 error body
+#   slow...   200 after --slow-seconds (use with a shorter response_timeout_s)
+#   bad...    200 with a body that is not JSON
+#   tab...    200 whose text contains a TAB (recorded as INVALID_OUTPUT, R-5)
+#   hang...   accept the request and never answer (for kill and restart demos)
+#   anything else: as ok
+#
+# It binds 127.0.0.1 only and logs one line per request to stderr.
+#
+# usage: axioma-standin [--port N] [--port-file PATH] [--slow-seconds S]
+
+import http.server
+import json
+import sys
+import threading
+import time
+
+
+def main(argv):
+    port, port_file, slow = 0, None, 3.0
+    i = 1
+    while i < len(argv):
+        if argv[i] == "--port" and i + 1 < len(argv):
+            port = int(argv[i + 1])
+            i += 2
+        elif argv[i] == "--port-file" and i + 1 < len(argv):
+            port_file = argv[i + 1]
+            i += 2
+        elif argv[i] == "--slow-seconds" and i + 1 < len(argv):
+            slow = float(argv[i + 1])
+            i += 2
+        else:
+            sys.stderr.write("usage: axioma-standin [--port N] [--port-file PATH] "
+                             "[--slow-seconds S]\n")
+            return 1
+    forever = threading.Event()
+    count = [0]
+    lock = threading.Lock()
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_POST(self):
+            body = self.rfile.read(int(self.headers.get("content-length", "0")))
+            with lock:
+                count[0] += 1
+                n = count[0]
+            try:
+                p = json.loads(body)["messages"][0]["content"]
+            except (ValueError, KeyError, IndexError, TypeError):
+                p = ""
+            word = p.split(" ", 1)[0]
+            sys.stderr.write("axioma-standin: request %d: %s\n" % (n, word or "(empty)"))
+            if word.startswith("hang"):
+                forever.wait()
+                return
+            code, stop, text, raw = 200, "end_turn", "echo: " + p, None
+            if word.startswith("trunc"):
+                stop = "max_tokens"
+            elif word.startswith("fail"):
+                code = 500
+            elif word.startswith("r429"):
+                code = 429
+            elif word.startswith("slow"):
+                time.sleep(slow)
+            elif word.startswith("bad"):
+                raw = b'{"content": [ not json'
+            elif word.startswith("tab"):
+                text = "a\tb"
+            if code != 200:
+                out = json.dumps({"type": "error", "error": {
+                    "type": "api_error", "message": "stand-in %d" % code}}).encode()
+            elif raw is not None:
+                out = raw
+            else:
+                out = json.dumps({"content": [{"type": "text", "text": text}],
+                                  "stop_reason": stop}).encode()
+            try:
+                self.send_response(code)
+                self.send_header("content-type", "application/json")
+                self.send_header("content-length", str(len(out)))
+                self.end_headers()
+                self.wfile.write(out)
+            except OSError:
+                pass
+
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), H)
+    srv.daemon_threads = True
+    bound = srv.server_address[1]
+    if port_file:
+        with open(port_file, "w") as f:
+            f.write("%d\n" % bound)
+    sys.stderr.write("axioma-standin: DEMO ONLY, listening on 127.0.0.1:%d\n" % bound)
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

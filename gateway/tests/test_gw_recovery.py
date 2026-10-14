@@ -26,6 +26,14 @@ Each test id is one ctest entry (CONTRACT.md, recovery plan revision 2):
   state_source AX:STATE:v1 carries the configuration digest and a
                source_commit that is either the clean checkout's HEAD or
                "unknown" (D8).
+  verifier     tools/axioma-verify-ledger on a real gateway ledger: verdicts
+               and exit codes for intact, edited, torn, truncated and
+               consistently rewritten ledgers, with and without a checkpoint
+               taken from a reply, and hostile input (needs <source-dir>).
+  file_modes   ledger and log are created 0640 under umask 022.
+
+Every file a test touches is inside its own temporary directory; the
+harness refuses to run against the production paths.
 
 Local stand-in upstreams only: no network egress, no spend. Standard library
 only. The ledger reader below is written from the frame format of record,
@@ -48,6 +56,9 @@ import sys
 import tempfile
 import threading
 import time
+
+# Never touched by any test (CONTRACT.md, OPERATOR.md).
+PRODUCTION = ("/var/lib/axioma-gateway", "/etc/axioma-gateway")
 
 CHAIN_TAG = b"AX:LEDGER:v1"
 GENESIS = (b'{"component":"axilog-core","evidence_type":"AX:STATE:v1",'
@@ -204,6 +215,11 @@ class Env:
         self.proc = None
 
     def write_conf(self, extra=""):
+        for path in (self.sock, self.ledger, self.wal, self.log, self.conf):
+            check(os.path.realpath(path).startswith(os.path.realpath(self.tmp) + os.sep),
+                  "refusing a path outside the test directory: %s" % path)
+            check(not any(os.path.realpath(path).startswith(p) for p in PRODUCTION),
+                  "refusing a production path: %s" % path)
         with open(self.conf, "w") as f:
             f.write("socket_path=%s\nledger_path=%s\nwal_path=%s\nlog_path=%s\n"
                     "model_id=test-model\noracle_id=test-oracle\n"
@@ -499,14 +515,130 @@ def t_state_source(e, srcdir):
         check(v == head, "source_commit %s is not HEAD %s" % (v, head))
 
 
+def _frames_raw(path):
+    with open(path, "rb") as f:
+        d = f.read()
+    out, off = [], 0
+    while off < len(d):
+        (tl,) = struct.unpack_from("<I", d, off)
+        (pl,) = struct.unpack_from("<Q", d, off + 4 + tl)
+        end = off + 4 + tl + 8 + pl + 32
+        out.append((d[off + 4:off + 4 + tl], d[off + 12 + tl:off + 12 + tl + pl], off, end))
+        off = end
+    return d, out
+
+
+def t_verifier(e, srcdir):
+    check(srcdir, "verifier test needs <source-dir>")
+    ver = os.path.join(srcdir, "tools", "axioma-verify-ledger")
+
+    def run(*args):
+        r = subprocess.run([sys.executable, "-I", ver] + list(args),
+                           capture_output=True, text=True)
+        check("Traceback" not in r.stderr, "verifier traceback: %s" % r.stderr)
+        return r.returncode, r.stdout
+
+    e.write_conf("max_attempts=1\n")
+    e.start()
+    replies = [e.request(p)[0] for p in ("ok one", "ok two", "fail three", "ok four")]
+    e.stop()
+    check(all("chain_head" in h for h in replies), "a reply carried no chain_head")
+    cp = "%s:%s" % (replies[1]["seq"], replies[1]["chain_head"])
+    last = replies[-1]["chain_head"]
+    data, fr = _frames_raw(e.ledger)
+    n = len(fr)
+    cps = int(replies[1]["seq"])
+
+    def variant(name, blob):
+        path = os.path.join(e.tmp, name)
+        with open(path, "wb") as f:
+            f.write(blob)
+        return path
+
+    # V-1 intact
+    rc, out = run(e.ledger)
+    check(rc == 4 and "CONSISTENT_UNANCHORED" in out, "V-1 intact: %d %s" % (rc, out))
+    check(("head=%s" % last) in out, "V-1: head differs from the gateway's last reply")
+    rc, out = run("--checkpoint", cp, e.ledger)
+    check(rc == 0 and "MATCHES_CHECKPOINT" in out, "V-1 checkpoint: %d %s" % (rc, out))
+    rc, out = run("--checkpoint", "%d:%s" % (n, last), e.ledger)
+    check(rc == 0 and "MATCHES_CHECKPOINT" in out, "V-7 final head: %d %s" % (rc, out))
+    rc, out = run("--list", e.ledger)
+    check(rc == 4 and out.count(" OBS ") == 4 and out.count(" STATE ") == 1,
+          "--list: %s" % out)
+    # V-2 one byte changed inside a payload
+    k = fr[2][2] + 4 + len(fr[2][0]) + 8 + 5
+    bad = bytearray(data)
+    bad[k] ^= 0x01
+    rc, out = run(variant("edit.bin", bytes(bad)))
+    check(rc == 2 and "INCONSISTENT" in out, "V-2 edit: %d %s" % (rc, out))
+    # V-3 cut inside the last frame
+    rc, out = run(variant("torn.bin", data[:-10]))
+    check(rc == 2 and "INCONSISTENT" in out and "torn" in out, "V-3 torn: %d %s" % (rc, out))
+    # V-4 cut at a frame boundary, no checkpoint: undetectable (the stated limit)
+    cut_after = variant("cut_after.bin", data[:fr[-2][3]])
+    rc, out = run(cut_after)
+    check(rc == 4 and "CONSISTENT_UNANCHORED" in out, "V-4 boundary cut: %d %s" % (rc, out))
+    # ... and still matches a checkpoint the cut does not reach
+    rc, out = run("--checkpoint", cp, cut_after)
+    check(rc == 0, "V-4 boundary cut after the checkpoint: %d %s" % (rc, out))
+    # V-5 cut below the checkpoint
+    rc, out = run("--checkpoint", cp, variant("cut_before.bin", data[:fr[cps - 2][3]]))
+    check(rc == 2 and "CHECKPOINT_MISMATCH" in out, "V-5: %d %s" % (rc, out))
+    # V-6 consistent rewrite of frame 2 (commits recomputed)
+    tag, pl = fr[1][0], fr[1][1].replace(b"echo: ok one", b"echo: ok ONE")
+    check(pl != fr[1][1], "rewrite fixture did not change the payload")
+    blob = b""
+    for i, (t, p, _, _) in enumerate(fr):
+        if i == 1:
+            t, p = tag, pl
+        blob += struct.pack("<I", len(t)) + t + struct.pack("<Q", len(p)) + p + _commit(t, p)
+    rw = variant("rewrite.bin", blob)
+    rc, out = run(rw)
+    check(rc == 4, "V-6 rewrite without checkpoint must look consistent: %d %s" % (rc, out))
+    rc, out = run("--checkpoint", cp, rw)
+    check(rc == 2 and "CHECKPOINT_MISMATCH" in out, "V-6 rewrite: %d %s" % (rc, out))
+    # V-8 hostile input: no traceback, a defined verdict
+    for name, blob in (("random.bin", os.urandom(4096)),
+                       ("hugelen.bin", struct.pack("<I", 0xFFFFFFFF) + b"x" * 64),
+                       ("bigpayload.bin", struct.pack("<I", 9) + b"AX:OBS:v1" +
+                        struct.pack("<Q", 1 << 40)),
+                       ("unregistered.bin", (lambda t, p: struct.pack("<I", len(t)) + t +
+                        struct.pack("<Q", len(p)) + p + _commit(t, p))(b"AX:BOGUS:v1", b"{}"))):
+        rc, out = run(variant(name, blob))
+        check(rc == 2 and ("REJECTED" in out or "INCONSISTENT" in out),
+              "V-8 %s: %d %s" % (name, rc, out))
+    rc, out = run(variant("empty.bin", b""))
+    check(rc == 4 and "frames=0" in out, "empty ledger: %d %s" % (rc, out))
+    rc, _ = run(os.path.join(e.tmp, "absent.bin"))
+    check(rc == 1, "missing file must exit 1")
+    rc, _ = run("--checkpoint", "x:y", e.ledger)
+    check(rc == 1, "malformed checkpoint must exit 1")
+
+
+def t_file_modes(e):
+    e.write_conf("max_attempts=1\n")
+    old = os.umask(0o022)
+    try:
+        e.start()
+    finally:
+        os.umask(old)
+    e.stop()
+    for path in (e.ledger, e.log):
+        mode = os.stat(path).st_mode & 0o777
+        check(mode == 0o640, "%s created %03o, expected 640" % (os.path.basename(path), mode))
+
+
 TESTS = {"b02_1": t_b02_1, "b02_2": t_b02_2, "b02_3": t_b02_3, "b02_4": t_b02_4,
-         "b02_5": t_b02_5, "oi_1": t_oi_1, "acc_1": t_acc_1}
+         "b02_5": t_b02_5, "oi_1": t_oi_1, "acc_1": t_acc_1,
+         "file_modes": t_file_modes}
 
 
 def main(argv):
-    if len(argv) not in (3, 4) or (argv[2] not in TESTS and argv[2] != "state_source"):
-        sys.stderr.write("usage: test_gw_recovery.py <axioma-gateway> <%s|state_source> "
-                         "[<source-dir>]\n" % "|".join(TESTS))
+    special = ("state_source", "verifier")
+    if len(argv) not in (3, 4) or (argv[2] not in TESTS and argv[2] not in special):
+        sys.stderr.write("usage: test_gw_recovery.py <axioma-gateway> <%s> [<source-dir>]\n"
+                         % "|".join(list(TESTS) + list(special)))
         return 2
     gw_bin, tid = os.path.abspath(argv[1]), argv[2]
     srcdir = argv[3] if len(argv) == 4 else None
@@ -516,6 +648,8 @@ def main(argv):
     try:
         if tid == "state_source":
             t_state_source(e, srcdir)
+        elif tid == "verifier":
+            t_verifier(e, srcdir)
         else:
             TESTS[tid](e)
         print("PASS %s" % tid)

@@ -18,7 +18,7 @@
 # No network egress and no spend: the oracle endpoint is a local
 # listener that accepts and never responds, so the request parks
 # in-flight and the kill lands mid-transfer. Requires python3, already
-# a tooling dependency (gw-client.py, ax-rtm-verify.py).
+# a tooling dependency (axioma-client, ax-rtm-verify.py).
 #
 # usage: test_gw_signals.sh <path-to-axioma-gateway-binary>
 

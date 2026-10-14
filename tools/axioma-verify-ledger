@@ -1,0 +1,202 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Spey Systems Ltd (SC889983)
+#
+# axioma-verify-ledger - offline verifier for an axioma-gateway ledger file.
+# Standard library only; shares no code with the C writer. Evolved from
+# axioma-audit tools/verify_chain.py (PCR-003), which read JSONL bundles.
+#
+# Construction (CONTRACT.md section 4):
+#   frame    = u32le tag_len | tag | u64le payload_len | payload | commit[32]
+#   commit   = SHA-256(tag || LE64(len payload) || payload)
+#   L0       = SHA-256("AX:LEDGER:v1" || commit("AX:STATE:v1", GENESIS))
+#   Ln       = SHA-256("AX:LEDGER:v1" || Ln-1 || commit_n)
+#
+# Verdicts (CONTRACT.md section 5):
+#   REJECTED              not a ledger: malformed frame lengths, or a tag
+#                         outside the registry
+#   INCONSISTENT          a frame does not match its commit, or the file
+#                         ends inside a frame (torn; if the gateway was
+#                         running while copying, copy again)
+#   CONSISTENT_UNANCHORED self-consistent only. A truncated or consistently
+#                         rewritten ledger also gets this verdict
+#   MATCHES_CHECKPOINT    the first SEQ frames reproduce the held head;
+#                         frames after SEQ are consistent but unanchored
+#   CHECKPOINT_MISMATCH   the held head is not reproduced at SEQ (history
+#                         up to SEQ altered, or fewer than SEQ frames)
+#
+# A checkpoint is a (seq, chain_head) pair the caller kept from a gateway
+# reply or an earlier verification. Where it came from is the caller's
+# responsibility; one taken from the same file proves nothing more.
+#
+# Exit status: 0 MATCHES_CHECKPOINT, 4 CONSISTENT_UNANCHORED, 2 any other
+# verdict, 1 usage or I/O error.
+#
+# usage: axioma-verify-ledger [--checkpoint SEQ:HEAD] [--list] LEDGER
+
+import hashlib
+import json
+import struct
+import sys
+
+CHAIN_TAG = b"AX:LEDGER:v1"
+GENESIS = (b'{"component":"axilog-core","evidence_type":"AX:STATE:v1",'
+           b'"is_terminal":false,"platform":"universal","state_hash":"'
+           + b"0" * 64 + b'"}')
+REGISTERED = {
+    b"AX:STATE:v1", b"AX:TRANS:v1", b"AX:OBS:v1", b"AX:POLICY:v1", b"AX:PROOF:v1",
+    b"AX:FCC:C:v1", b"AX:FCC:TS:v1", b"AX:FCC:DEV:v1", b"AX:FCC:REG:v1",
+    b"AX:FCC:VERDICT:v1",
+}
+TAG_MAX = 32
+PAYLOAD_MAX = 1 << 20
+
+USAGE = "usage: axioma-verify-ledger [--checkpoint SEQ:HEAD] [--list] LEDGER\n"
+
+
+def commit(tag, payload):
+    return hashlib.sha256(tag + struct.pack("<Q", len(payload)) + payload).digest()
+
+
+def genesis_head():
+    return hashlib.sha256(CHAIN_TAG + commit(b"AX:STATE:v1", GENESIS)).digest()
+
+
+class Stop(Exception):
+    def __init__(self, verdict, why):
+        Exception.__init__(self, why)
+        self.verdict, self.why = verdict, why
+
+
+def read_exact(f, n):
+    b = f.read(n)
+    return b if len(b) == n else None
+
+
+def frames(f):
+    """Yield (seq, tag, payload, head_after). Raises Stop on any fault."""
+    head, seq, off = genesis_head(), 0, 0
+    while True:
+        h4 = f.read(4)
+        if not h4:
+            return
+        start = off
+        if len(h4) < 4:
+            raise Stop("INCONSISTENT", "torn frame at byte %d (after frame %d)" % (start, seq))
+        (tl,) = struct.unpack("<I", h4)
+        if tl == 0 or tl > TAG_MAX:
+            raise Stop("REJECTED", "bad tag length %d at byte %d" % (tl, start))
+        tag = read_exact(f, tl)
+        h8 = read_exact(f, 8) if tag is not None else None
+        if h8 is None:
+            raise Stop("INCONSISTENT", "torn frame at byte %d (after frame %d)" % (start, seq))
+        (pl,) = struct.unpack("<Q", h8)
+        if pl == 0 or pl > PAYLOAD_MAX:
+            raise Stop("REJECTED", "bad payload length %d at byte %d" % (pl, start))
+        payload = read_exact(f, pl)
+        stored = read_exact(f, 32) if payload is not None else None
+        if stored is None:
+            raise Stop("INCONSISTENT", "torn frame at byte %d (after frame %d)" % (start, seq))
+        if tag not in REGISTERED:
+            raise Stop("REJECTED", "unregistered tag %r at frame %d" % (tag, seq + 1))
+        c = commit(tag, payload)
+        if c != stored:
+            raise Stop("INCONSISTENT", "frame %d does not match its commit" % (seq + 1))
+        head = hashlib.sha256(CHAIN_TAG + head + c).digest()
+        seq += 1
+        off += 4 + tl + 8 + pl + 32
+        yield seq, tag, payload, head
+
+
+def summary_line(seq, tag, payload):
+    try:
+        r = json.loads(payload)
+    except ValueError:
+        return "%6d %s (payload is not JSON)" % (seq, tag.decode())
+    if tag == b"AX:OBS:v1":
+        return "%6d OBS   %-9s %-16s input=%s output_size=%s" % (
+            seq, r.get("completion_state"), r.get("failure_type") or "-",
+            str(r.get("input_hash", ""))[:12], r.get("output_size"))
+    if tag == b"AX:STATE:v1":
+        return "%6d STATE config=%s source=%s" % (
+            seq, str(r.get("config_sha256", ""))[:12], r.get("source_commit", "(none)"))
+    return "%6d %s" % (seq, tag.decode())
+
+
+def parse_args(argv):
+    cp, listing, path = None, False, None
+    i = 1
+    while i < len(argv):
+        a = argv[i]
+        if a == "--checkpoint" and i + 1 < len(argv):
+            s, _, h = argv[i + 1].partition(":")
+            if not s.isdigit() or int(s) < 1 or len(h) != 64:
+                raise ValueError("checkpoint must be SEQ:HEAD (SEQ >= 1, HEAD 64 hex)")
+            cp = (int(s), bytes.fromhex(h))
+            i += 2
+        elif a == "--list":
+            listing = True
+            i += 1
+        elif a.startswith("-") or path is not None:
+            raise ValueError("unexpected argument %r" % a)
+        else:
+            path = a
+            i += 1
+    if path is None:
+        raise ValueError("no ledger given")
+    return cp, listing, path
+
+
+def main(argv):
+    try:
+        cp, listing, path = parse_args(argv)
+    except ValueError as e:
+        sys.stderr.write("error: %s\n%s" % (e, USAGE))
+        return 1
+    counts, states, n, head = {}, [], 0, genesis_head()
+    at_cp = None
+    try:
+        with open(path, "rb") as f:
+            for seq, tag, payload, head in frames(f):
+                n = seq
+                counts[tag] = counts.get(tag, 0) + 1
+                if listing:
+                    print(summary_line(seq, tag, payload))
+                if tag == b"AX:STATE:v1":
+                    try:
+                        states.append((seq, json.loads(payload).get("source_commit")))
+                    except ValueError:
+                        pass
+                if cp is not None and seq == cp[0]:
+                    at_cp = head
+    except OSError as e:
+        sys.stderr.write("error: %s\n" % e)
+        return 1
+    except Stop as s:
+        print("%s: %s" % (s.verdict, s.why))
+        return 2
+
+    print("frames=%d head=%s %s" % (n, head.hex(), " ".join(
+        "%s=%d" % (t.decode(), c) for t, c in sorted(counts.items()))))
+    if states:
+        last = states[-1]
+        print("last start: seq=%d source_commit=%s" % (last[0], last[1] or "(not recorded)"))
+    if cp is None:
+        print("CONSISTENT_UNANCHORED: self-consistent; removal of trailing frames "
+              "or a consistent rewrite would not be detected without a checkpoint")
+        return 4
+    if at_cp is None:
+        print("CHECKPOINT_MISMATCH: the ledger has %d frames; the checkpoint is at %d"
+              % (n, cp[0]))
+        return 2
+    if at_cp != cp[1]:
+        print("CHECKPOINT_MISMATCH: head at %d is %s, checkpoint says %s"
+              % (cp[0], at_cp.hex(), cp[1].hex()))
+        return 2
+    print("MATCHES_CHECKPOINT: frames 1..%d reproduce the held head; %d later "
+          "frame(s) are consistent but unanchored" % (cp[0], n - cp[0]))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

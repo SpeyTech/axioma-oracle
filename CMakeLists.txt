@@ -350,7 +350,7 @@ if(ORACLE_BUILD_GATEWAY)
     add_test(NAME test_gw_client COMMAND sh
              ${CMAKE_CURRENT_SOURCE_DIR}/gateway/tests/test_gw_client.sh
              $<TARGET_FILE:axioma-gateway>
-             ${CMAKE_CURRENT_SOURCE_DIR}/gateway/gw-client.py)
+             ${CMAKE_CURRENT_SOURCE_DIR}/tools/axioma-client)
     set_tests_properties(test_gw_client PROPERTIES
         TIMEOUT 60
         SKIP_RETURN_CODE 77)
@@ -436,7 +436,8 @@ if(ORACLE_BUILD_GATEWAY)
 
     # Evidence accounting and intent recovery (CONTRACT.md; recovery plan
     # revision 2, E3): B-02, open-intent exit, accounting, STATE source.
-    foreach(t b02_1 b02_2 b02_3 b02_4 b02_5 oi_1 acc_1 state_source)
+    foreach(t b02_1 b02_2 b02_3 b02_4 b02_5 oi_1 acc_1 state_source
+              verifier file_modes)
         add_test(NAME test_gw_recovery_${t}
                  COMMAND ${PYTHON3_EXE} -I
                          ${CMAKE_CURRENT_SOURCE_DIR}/gateway/tests/test_gw_recovery.py

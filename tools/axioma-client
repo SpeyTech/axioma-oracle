@@ -1,6 +1,10 @@
-"""Reference client for the gateway's Unix-socket line protocol.
+#!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Spey Systems Ltd (SC889983)
+"""axioma-client: reference client for the gateway's Unix-socket line protocol
+(gateway/README.md). Formerly gateway/gw-client.py.
 
-usage: gw-client.py SOCKET PROMPT [TEMPERATURE_Q16]
+usage: axioma-client SOCKET PROMPT [TEMPERATURE_Q16]
 
 TEMPERATURE_Q16 is a Q16.16 integer (65536 = 1.0), default 0. The gateway
 requires the temperature_q16 line and refuses an unpinned request with
@@ -10,11 +14,11 @@ import socket
 import sys
 
 if len(sys.argv) not in (3, 4):
-    sys.exit("usage: gw-client.py SOCKET PROMPT [TEMPERATURE_Q16]")
+    sys.exit("usage: axioma-client SOCKET PROMPT [TEMPERATURE_Q16]")
 prompt = sys.argv[2].encode()
 temperature_q16 = int(sys.argv[3]) if len(sys.argv) == 4 else 0
 if not 0 <= temperature_q16 <= 131072:
-    sys.exit("gw-client.py: TEMPERATURE_Q16 must be 0..131072 (0.0 to 2.0)")
+    sys.exit("axioma-client: TEMPERATURE_Q16 must be 0..131072 (0.0 to 2.0)")
 s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 s.connect(sys.argv[1])
 hdr = b"max_tokens: 64\ntemperature_q16: %d\nprompt_len: %d\n\n" % (

@@ -9,6 +9,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 static FILE *g_log = NULL;
 static char  g_secret[256];
@@ -16,8 +17,13 @@ static size_t g_secret_len = 0;
 
 int gw_log_open(const char *path, const char *secret)
 {
-    g_log = fopen(path, "ab");
-    if (g_log == NULL) return -1;
+    /* 0640 like the ledger and intent: the log carries upstream error
+     * text and input hashes. fopen() would create it 0666 & ~umask
+     * (0644 under the usual umask). An existing file keeps its mode. */
+    int fd = open(path, O_WRONLY | O_APPEND | O_CREAT, 0640);
+    if (fd < 0) return -1;
+    g_log = fdopen(fd, "ab");
+    if (g_log == NULL) { close(fd); return -1; }
     g_secret_len = 0;
     if (secret != NULL) {
         size_t n = strlen(secret);

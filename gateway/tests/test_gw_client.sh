@@ -3,24 +3,24 @@
 # Copyright (C) 2026 Spey Systems Ltd (SC889983)
 #
 # test_gw_client.sh - PCR-004 residual (d): the reference client
-# gateway/gw-client.py must send a request the gateway accepts.
+# tools/axioma-client must send a request the gateway accepts.
 #
 # The gateway requires an explicit temperature_q16 line (G1) and refuses
 # a request without it (reason temperature_required). The client
 # predated that rule. This drives the real gateway against a local
 # stand-in oracle endpoint (no network egress, no spend) and checks that
-# a request from gw-client.py is served and committed:
+# a request from axioma-client is served and committed:
 #   1. default call: status ok, COMPLETE/NULL, temperature_q16 0 echoed;
 #   2. explicit TEMPERATURE_Q16 argument (45875) echoed as sent;
 #   3. the ledger holds two AX:OBS:v1 records, both COMPLETE/NULL,
 #      with temperature 0 and 45875.
 #
-# usage: test_gw_client.sh <axioma-gateway binary> <gw-client.py>
+# usage: test_gw_client.sh <axioma-gateway binary> <axioma-client>
 
 set -eu
 
-GW_BIN="${1:?usage: test_gw_client.sh <axioma-gateway> <gw-client.py>}"
-CLIENT="${2:?usage: test_gw_client.sh <axioma-gateway> <gw-client.py>}"
+GW_BIN="${1:?usage: test_gw_client.sh <axioma-gateway> <axioma-client>}"
+CLIENT="${2:?usage: test_gw_client.sh <axioma-gateway> <axioma-client>}"
 
 if ! command -v python3 >/dev/null 2>&1; then
     echo "SKIP: python3 required" >&2
@@ -135,5 +135,5 @@ PYEOF
 printf '%s\n' "--- committed AX:OBS:v1 records (completion_state failure_type temperature)" "${RECS}"
 [ "${RECS}" = "$(printf 'COMPLETE None 0\nCOMPLETE None 45875')" ] || fail "ledger records not as expected"
 
-echo "OK: gw-client.py requests accepted, served and committed"
+echo "OK: axioma-client requests accepted, served and committed"
 exit 0
