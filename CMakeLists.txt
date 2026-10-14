@@ -38,6 +38,21 @@ set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG")
 set(CMAKE_C_FLAGS_DEBUG "-g -O0")
 
 # ==============================================================================
+# Substrate: SHA-256 and domain-separated commitment over platform libcrypto
+# (owner decision D5; substrate/src/axilog_crypto.c)
+# ==============================================================================
+
+find_package(OpenSSL 3.0 REQUIRED COMPONENTS Crypto)
+
+add_library(axilog_substrate STATIC
+    substrate/src/axilog_crypto.c
+)
+target_include_directories(axilog_substrate PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/substrate/include
+)
+target_link_libraries(axilog_substrate PUBLIC OpenSSL::Crypto)
+
+# ==============================================================================
 # Library Target
 # ==============================================================================
 
@@ -54,22 +69,9 @@ target_include_directories(axioma_oracle PUBLIC
 )
 
 
-# ==============================================================================
-# libaxilog Linkage (sdk-root)
-# ==============================================================================
-
-# axilog_sha256() and axilog_commit() — replaces standalone hash.c SHA-256
-# Aligns oracle with DVEC-001 §4.3 domain-separated commitment format
-set(AXILOG_SDK_ROOT "$ENV{HOME}/axilog/sdk-root"
-    CACHE PATH "Path to axioma sdk-root installation")
-
-target_include_directories(axioma_oracle PUBLIC
-    ${AXILOG_SDK_ROOT}/include
-)
-
-target_link_libraries(axioma_oracle PRIVATE
-    ${AXILOG_SDK_ROOT}/lib/libaxilog.a
-)
+# axilog_sha256() and axilog_commit() (DVEC-001 section 4.3) come from the
+# substrate library above; its headers are public through this link.
+target_link_libraries(axioma_oracle PUBLIC axilog_substrate)
 
 # ==============================================================================
 # Core Test Targets
@@ -170,6 +172,33 @@ add_test(NAME test_obs_v1_loss_check_cli
          COMMAND ${PYTHON3_EXE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_obs_v1_loss_check_cli.py
                  ${CMAKE_CURRENT_SOURCE_DIR}/tools/obs_v1_loss_check.py)
 
+# Ledger (imported from axioma-audit c40810b; ledger/): append, genesis,
+# commitment and chain recomputation.
+add_library(axioma_ledger STATIC ledger/src/ledger.c)
+target_include_directories(axioma_ledger PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/ledger/include)
+target_link_libraries(axioma_ledger PUBLIC axilog_substrate)
+foreach(t test_ledger test_commitment test_chain_verify)
+    add_executable(${t} ledger/tests/${t}.c)
+    target_link_libraries(${t} axioma_ledger)
+    add_test(NAME ${t} COMMAND ${t})
+endforeach()
+
+# Cross-architecture fingerprints: the program's output hash must equal the
+# pinned value on every build (ci/check_fingerprint.cmake).
+add_executable(fingerprint_oracle ci/fingerprint.c)
+target_link_libraries(fingerprint_oracle axioma_oracle)
+add_test(NAME test_fingerprint_oracle
+         COMMAND ${CMAKE_COMMAND} -DPROG=$<TARGET_FILE:fingerprint_oracle>
+                 -DPIN=${CMAKE_CURRENT_SOURCE_DIR}/ci/fingerprints.txt
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/ci/check_fingerprint.cmake)
+add_executable(fingerprint_ledger ci/fingerprint_ledger.c)
+target_link_libraries(fingerprint_ledger axioma_ledger)
+add_test(NAME test_fingerprint_ledger
+         COMMAND ${CMAKE_COMMAND} -DPROG=$<TARGET_FILE:fingerprint_ledger>
+                 -DPIN=${CMAKE_CURRENT_SOURCE_DIR}/ci/fingerprints_ledger.txt
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/ci/check_fingerprint.cmake)
+
 # Test: NFC Limitation Documentation
 add_executable(test_nfc_limitation tests/test_nfc_limitation.c)
 target_link_libraries(test_nfc_limitation axioma_oracle)
@@ -208,13 +237,8 @@ endif()
 # Install Configuration
 # ==============================================================================
 
-install(TARGETS axioma_oracle
-    ARCHIVE DESTINATION lib
-)
-
-install(DIRECTORY include/axilog
-    DESTINATION include
-)
+# Installation is the gateway, its tools and their documentation only
+# (INSTALL.md). The libraries are internal to this build.
 
 # ==============================================================================
 # Summary
@@ -236,22 +260,16 @@ option(ORACLE_BUILD_GATEWAY "Build the gateway service" ON)
 if(ORACLE_BUILD_GATEWAY)
     find_package(CURL REQUIRED)
 
-    set(AXIOMA_AUDIT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../axioma-audit"
-        CACHE PATH "Path to axioma-audit checkout")
-
-    # TU group B: the ledger seam compiles against audit + substrate only.
+    # TU group B: the ledger seam compiles against ledger + substrate only.
     # E-ABI-1 is fixed (ct_fault_flags_t is one type estate-wide) but the
     # disjoint include sets stay: defence in depth, per CONFORMANCE.md §12.
     add_library(gw-ledger STATIC
         gateway/src/gw_ledger.c
-        ${AXIOMA_AUDIT_ROOT}/src/ledger.c
     )
     target_include_directories(gw-ledger PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/gateway/include
-        ${AXIOMA_AUDIT_ROOT}/include
-        ${AXILOG_SDK_ROOT}/include
     )
-    target_link_libraries(gw-ledger PRIVATE ${AXILOG_SDK_ROOT}/lib/libaxilog.a)
+    target_link_libraries(gw-ledger PRIVATE axioma_ledger)
 
     # TU group A: everything else, against the oracle library.
     add_executable(axioma-gateway
@@ -289,17 +307,13 @@ if(ORACLE_BUILD_GATEWAY)
     add_test(NAME test_gw_json COMMAND test_gw_json)
 
     add_executable(test_gw_ledger gateway/tests/test_gw_ledger.c)
-    target_include_directories(test_gw_ledger PRIVATE
-        gateway/include ${AXIOMA_AUDIT_ROOT}/include ${AXILOG_SDK_ROOT}/include)
-    target_link_libraries(test_gw_ledger PRIVATE gw-ledger
-        ${AXILOG_SDK_ROOT}/lib/libaxilog.a)
+    target_include_directories(test_gw_ledger PRIVATE gateway/include)
+    target_link_libraries(test_gw_ledger PRIVATE gw-ledger axioma_ledger)
     add_test(NAME test_gw_ledger COMMAND test_gw_ledger)
 
     add_executable(test_gw_export gateway/tests/test_gw_export.c)
-    target_include_directories(test_gw_export PRIVATE
-        gateway/include ${AXIOMA_AUDIT_ROOT}/include ${AXILOG_SDK_ROOT}/include)
-    target_link_libraries(test_gw_export PRIVATE gw-ledger
-        ${AXILOG_SDK_ROOT}/lib/libaxilog.a)
+    target_include_directories(test_gw_export PRIVATE gateway/include)
+    target_link_libraries(test_gw_export PRIVATE gw-ledger axioma_ledger)
     add_test(NAME test_gw_export COMMAND test_gw_export)
 
     add_executable(test_gw_wal
