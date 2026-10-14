@@ -211,13 +211,16 @@ class Env:
                     "connect_timeout_s=5\ncall_budget=50\n%s"
                     % (self.sock, self.ledger, self.wal, self.log, self.si.port, extra))
 
-    def start(self, fsize_limit=None, expect_ready=True):
+    def start(self, fsize_limit=None, expect_ready=True, ignore_xfsz=False):
         env = dict(os.environ, AX_ORACLE_ANTHROPIC_KEY="test-key-not-real")
         env.pop("NOTIFY_SOCKET", None)
 
         def limit():
-            if fsize_limit is not None:
+            # SIGXFSZ ignored: a write past the limit fails with EFBIG and
+            # takes the gateway's error path instead of killing it.
+            if fsize_limit is not None or ignore_xfsz:
                 signal.signal(signal.SIGXFSZ, signal.SIG_IGN)
+            if fsize_limit is not None:
                 resource.setrlimit(resource.RLIMIT_FSIZE, (fsize_limit, fsize_limit))
 
         self.proc = subprocess.Popen([self.gw_bin, self.conf], env=env,
@@ -405,8 +408,11 @@ def t_oi_1(e):
         check(h.get("status") == "ok", "filler request %d not served" % i)
     e.stop()
     os.unlink(e.log)
-    limit = os.path.getsize(e.ledger) + 600     # room for STATE, not for okbig
-    e.start(fsize_limit=limit)
+    # Start normally, then cap file size just above the ledger as it stands
+    # after start-up: the next record (about 4.5 KiB) cannot be appended.
+    e.start(ignore_xfsz=True)
+    limit = os.path.getsize(e.ledger) + 100
+    resource.prlimit(e.proc.pid, resource.RLIMIT_FSIZE, (limit, limit))
     prompt = "okbig append will fail"
     h, _ = e.request(prompt)
     check("obs_hash" not in h, "request reported as recorded: %r" % h)
@@ -420,6 +426,13 @@ def t_oi_1(e):
     check(rc != 0, "gateway exited with status 0 after an internal fault")
     check(os.path.exists(e.wal), "open intent not preserved for recovery")
     check('"event":"fault"' in e.log_text(), "no diagnostic logged")
+    # Persistent fault: the same cap at the next start must be refused
+    # visibly (the Interrupted record cannot be appended either), never
+    # served around.
+    rc = e.start(fsize_limit=limit, expect_ready=False)
+    check(rc is not None and rc != 0, "persistent fault: gateway started")
+    check(os.path.exists(e.wal), "persistent fault: intent removed")
+    # Fault cleared: the next start records the call as Interrupted.
     e.start()
     e.stop()
     recs = obs_records(e.ledger)

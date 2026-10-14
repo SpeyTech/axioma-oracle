@@ -155,6 +155,8 @@ typedef struct {
     char               *norm;         /* normalised prompt */
     char               *escaped;      /* escaped prompt for request JSON */
     char               *reqjson;      /* request body */
+    int                 fatal;        /* an intent is open: stop serving, exit
+                                         non-zero; start-up recovery records it */
 } gw_state_t;
 
 static char g_output_buf[AX_MAX_OUTPUT_BYTES];
@@ -162,8 +164,10 @@ static char g_canon_buf[AX_CANONICAL_BUFFER_SIZE];
 static char g_text_buf[AX_MAX_OUTPUT_BYTES];
 
 /* Build, admit, validate, canonicalise, append. Returns 0 and fills
- * obs_hash_hex/head_hex/seq on success; -1 on internal fault (alarmed:
- * the wrapper disagreeing with itself). */
+ * obs_hash_hex/head_hex/seq on success; -1 when the record is rejected
+ * (admission, validation or canonical form); -2 when the ledger append
+ * fails, after which nothing more may be appended by this process (a
+ * partial frame may be on disk; start-up truncates it under the intent). */
 static int commit_observation(gw_state_t *st,
                               ax_completion_state_t state,
                               ax_failure_type_t ftype,
@@ -205,7 +209,7 @@ static int commit_observation(gw_state_t *st,
     if (clen <= 0) return -1;
 
     if (gwl_append(GW_TAG_OBS, (const uint8_t *)g_canon_buf,
-                   (uint64_t)clen, head, seq_out) != 0) return -1;
+                   (uint64_t)clen, head, seq_out) != 0) return -2;
 
     memcpy(obs_hash_hex, rec.obs_hash, AX_HASH_HEX_SIZE);
     hex32(head_hex, head);
@@ -326,6 +330,10 @@ static void handle_request(gw_state_t *st, int cfd, const char *api_key)
         if (gw_wal_write(st->cfg->wal_path, &intent) != 0) {
             gw_log("error", "fault", "WAL intent write failed", -1, -1, 0);
             proto_error(cfd, "internal");
+            /* Nothing was sent. A file left at wal_path (an intent already
+             * open, or a partial write) would refuse every later request:
+             * stop instead, so start-up decides what it is. */
+            if (access(st->cfg->wal_path, F_OK) == 0) st->fatal = 1;
             return;
         }
         gw_log("info", "intent", input_hash_hex, -1, -1, gwl_seq() + 1u);
@@ -388,7 +396,8 @@ static void handle_request(gw_state_t *st, int cfd, const char *api_key)
         if (gwc_call(st->cfg, api_key, st->reqjson, (size_t)n, &res) != 0) {
             gw_log("error", "fault", "client allocation failure", -1, -1, 0);
             proto_error(cfd, "internal");
-            return;   /* WAL intent left open deliberately: restart closes it */
+            st->fatal = 1;   /* intent open: exit; start-up records it */
+            return;
         }
         (void)snprintf(reqhdr, sizeof reqhdr, "%s", res.errbuf);
 
@@ -473,10 +482,18 @@ static void handle_request(gw_state_t *st, int cfd, const char *api_key)
              * to INVALID_OUTPUT with empty output, per the schema-forced
              * ruling; the paid completion is never silently discarded,
              * its rejection is the recorded fact. */
-            if (commit_observation(st, state, ftype,
-                                   st->norm, (size_t)prompt_len,
-                                   output, output_len, &params,
-                                   obs_hash_hex, head_hex, &seq) != 0) {
+            int crc = commit_observation(st, state, ftype,
+                                         st->norm, (size_t)prompt_len,
+                                         output, output_len, &params,
+                                         obs_hash_hex, head_hex, &seq);
+            if (crc == -2) {
+                gw_log("error", "fault", "ledger append failed", -1, -1, 0);
+                gwc_result_free(&res);
+                proto_error(cfd, "internal");
+                st->fatal = 1;   /* intent open: exit; start-up records it */
+                return;
+            }
+            if (crc != 0) {
                 if (state == AX_COMPLETION_COMPLETE ||
                     state == AX_COMPLETION_TRUNCATED) {
                     gw_log("warn", "oracle_fail",
@@ -490,26 +507,33 @@ static void handle_request(gw_state_t *st, int cfd, const char *api_key)
                                            output, output_len, &params,
                                            obs_hash_hex, head_hex, &seq) != 0) {
                         gw_log("error", "fault",
-                               "record validation reject: wrapper disagrees with itself",
-                               -1, -1, 0);
+                               "observation not committed (INVALID_OUTPUT record "
+                               "rejected or ledger append failed)", -1, -1, 0);
                         gwc_result_free(&res);
                         proto_error(cfd, "internal");
-                        return;   /* WAL open; restart replays */
+                        st->fatal = 1;   /* intent open: exit; start-up records it */
+                        return;
                     }
                 } else {
                     gw_log("error", "fault",
-                           "record validation reject: wrapper disagrees with itself",
-                           -1, -1, 0);
+                           "observation not committed (record rejected: the "
+                           "wrapper disagrees with itself)", -1, -1, 0);
                     gwc_result_free(&res);
                     proto_error(cfd, "internal");
-                    return;       /* WAL open; restart replays */
+                    st->fatal = 1;       /* intent open: exit; start-up records it */
+                    return;
                 }
             }
             gwc_result_free(&res);
 
             /* observation durable: close the intent */
-            if (gw_wal_clear(st->cfg->wal_path) != 0)
+            if (gw_wal_clear(st->cfg->wal_path) != 0) {
+                /* The record is durable; reply, then exit so the leftover
+                 * intent cannot refuse every later request. Start-up finds
+                 * the record at the intent's sequence and clears it. */
                 gw_log("error", "fault", "WAL clear failed", -1, -1, seq);
+                st->fatal = 1;
+            }
             gw_log("info", "obs_committed", obs_hash_hex, -1, -1, seq);
 
             /* Export mirror failure is fail-open for serving (the
@@ -880,6 +904,20 @@ int main(int argc, char **argv)
         }
         handle_request(&st, cfd, api_key);
         close(cfd);
+        if (st.fatal) {
+            /* CONTRACT.md section 3: never serve on with an open intent.
+             * The intent stays for start-up recovery; systemd restarts. */
+            gw_log("error", "fault",
+                   "open intent after an internal fault; exiting for start-up "
+                   "recovery", -1, -1, gwl_seq());
+            close(lfd);
+            (void)unlink(cfg.socket_path);
+            gwc_global_cleanup();
+            gwl_close();
+            gw_log_close();
+            free(st.prompt); free(st.norm); free(st.escaped); free(st.reqjson);
+            return EXIT_FAILURE;
+        }
     }
 
     gw_log("info", "shutdown", NULL, -1, -1, gwl_seq());
