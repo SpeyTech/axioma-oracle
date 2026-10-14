@@ -405,6 +405,19 @@ if(ORACLE_BUILD_GATEWAY)
     set_tests_properties(test_gw_api_url_scheme PROPERTIES
         TIMEOUT 180
         SKIP_RETURN_CODE 77)
+
+    # Evidence accounting and intent recovery (CONTRACT.md; recovery plan
+    # revision 2, E3): B-02, open-intent exit, accounting, STATE source.
+    foreach(t b02_1 b02_2 b02_3 b02_4 b02_5 oi_1 acc_1 state_source)
+        add_test(NAME test_gw_recovery_${t}
+                 COMMAND ${PYTHON3_EXE} -I
+                         ${CMAKE_CURRENT_SOURCE_DIR}/gateway/tests/test_gw_recovery.py
+                         $<TARGET_FILE:axioma-gateway> ${t}
+                         ${CMAKE_CURRENT_SOURCE_DIR})
+        set_tests_properties(test_gw_recovery_${t} PROPERTIES
+            TIMEOUT 180
+            SKIP_RETURN_CODE 77)
+    endforeach()
 endif()
 
 # Shell tooling lint gate: scripts are code. Fails loudly when
